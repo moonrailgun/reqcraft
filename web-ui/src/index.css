@@ -1,0 +1,118 @@
+@import "tailwindcss";
+@import "@mantine/core/styles.css";
+
+@theme {
+  --font-sans: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+
+  --color-bg-primary: #1c1c1c;
+  --color-bg-secondary: #252526;
+  --color-bg-tertiary: #2d2d2d;
+  --color-bg-hover: #3c3c3c;
+  --color-border: #404040;
+  --color-text-primary: #e4e4e4;
+  --color-text-secondary: #9d9d9d;
+  --color-accent: #ff6c37;
+  --color-accent-hover: #ff8c5a;
+  --color-success: #49cc90;
+  --color-warning: #fca130;
+  --color-error: #f93e3e;
+  --color-info: #61affe;
+
+  --color-method-get: #61affe;
+  --color-method-post: #49cc90;
+  --color-method-put: #fca130;
+  --color-method-delete: #f93e3e;
+  --color-method-patch: #50e3c2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Resize handle styles */
+.resize-handle {
+  width: 1px !important;
+  background-color: var(--color-border) !important;
+  cursor: col-resize !important;
+  transition: background-color 0.15s ease !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  outline-style: none !important;
+  outline-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-focus-ring-color: transparent !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  accent-color: var(--color-accent) !important;
+  forced-color-adjust: none !important;
+}
+
+/* Force no focus ring in all browsers */
+.resize-handle::-moz-focus-inner {
+  border: 0 !important;
+  outline: none !important;
+}
+
+.resize-handle:hover,
+.resize-handle:active,
+.resize-handle:focus,
+.resize-handle:focus-visible,
+.resize-handle[data-separator="active"] {
+  background-color: var(--color-accent) !important;
+  outline: none !important;
+  outline-width: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Global override for any focus ring on the resize handle */
+*:focus .resize-handle,
+.resize-handle *,
+.resize-handle::before,
+.resize-handle::after {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Global focus-visible override */
+:focus-visible {
+  outline: none;
+}
+
+/* Override Mantine focus styles for separator elements */
+[role="separator"] {
+  outline: none !important;
+}
+
+[role="separator"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}

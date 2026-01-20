@@ -1,0 +1,244 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RqcConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<ConfigBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub imports: Vec<String>,
+    #[serde(default)]
+    pub apis: Vec<ApiBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<CategoryBlock>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryBlock {
+    pub id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub desc: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    #[serde(default)]
+    pub apis: Vec<ApiBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<CategoryBlock>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigBlock {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub base_urls: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiBlock {
+    pub path: String,
+    pub methods: Vec<MethodBlock>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MethodBlock {
+    pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<SchemaBlock>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SchemaBlock {
+    pub fields: Vec<Field>,
+    #[serde(default)]
+    pub optional: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Field {
+    pub name: String,
+    pub field_type: FieldType,
+    #[serde(default)]
+    pub optional: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nested: Option<Box<SchemaBlock>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mock: Option<MockValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub example: Option<MockValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    #[serde(default)]
+    pub is_params: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FieldType {
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MockValue {
+    String(String),
+    Number(f64),
+    Boolean(bool),
+}
+
+// Flattened API representation for Web UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiEndpoint {
+    pub id: String,
+    pub path: String,
+    pub full_url: Option<String>,
+    pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category_name: Option<String>,
+}
+
+// Category representation for Web UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryInfo {
+    pub id: String,
+    pub name: Option<String>,
+    pub desc: Option<String>,
+    pub endpoint_count: usize,
+    #[serde(default)]
+    pub children: Vec<CategoryInfo>,
+}
+
+impl RqcConfig {
+    pub fn get_base_urls(&self) -> Vec<String> {
+        self.config
+            .as_ref()
+            .map(|c| c.base_urls.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn to_endpoints(&self) -> Vec<ApiEndpoint> {
+        let base_url = self.get_base_urls().first().cloned();
+        let mut endpoints = Vec::new();
+        let mut id_counter = 0;
+
+        // Process top-level APIs (no category)
+        for api in &self.apis {
+            for method in &api.methods {
+                id_counter += 1;
+                let full_url = base_url
+                    .as_ref()
+                    .map(|base| format!("{}{}", base.trim_end_matches('/'), &api.path));
+
+                endpoints.push(ApiEndpoint {
+                    id: format!("api-{}", id_counter),
+                    path: api.path.clone(),
+                    full_url,
+                    method: method.method.clone(),
+                    name: method.name.clone(),
+                    description: method.description.clone(),
+                    request: method.request.clone(),
+                    response: method.response.clone(),
+                    category_id: None,
+                    category_name: None,
+                });
+            }
+        }
+
+        // Process categories recursively
+        fn process_category(
+            category: &CategoryBlock,
+            base_url: &Option<String>,
+            prefix_stack: &str,
+            endpoints: &mut Vec<ApiEndpoint>,
+            id_counter: &mut usize,
+        ) {
+            let current_prefix = if let Some(ref p) = category.prefix {
+                format!("{}{}", prefix_stack, p)
+            } else {
+                prefix_stack.to_string()
+            };
+
+            // Process APIs in this category
+            for api in &category.apis {
+                for method in &api.methods {
+                    *id_counter += 1;
+                    let full_path = format!("{}{}", current_prefix, api.path);
+                    let full_url = base_url
+                        .as_ref()
+                        .map(|base| format!("{}{}", base.trim_end_matches('/'), &full_path));
+
+                    endpoints.push(ApiEndpoint {
+                        id: format!("api-{}", id_counter),
+                        path: full_path,
+                        full_url,
+                        method: method.method.clone(),
+                        name: method.name.clone(),
+                        description: method.description.clone(),
+                        request: method.request.clone(),
+                        response: method.response.clone(),
+                        category_id: Some(category.id.clone()),
+                        category_name: category.name.clone(),
+                    });
+                }
+            }
+
+            // Process nested categories
+            for child in &category.children {
+                process_category(child, base_url, &current_prefix, endpoints, id_counter);
+            }
+        }
+
+        for category in &self.categories {
+            process_category(category, &base_url, "", &mut endpoints, &mut id_counter);
+        }
+
+        endpoints
+    }
+
+    pub fn to_categories(&self) -> Vec<CategoryInfo> {
+        fn convert_category(category: &CategoryBlock) -> CategoryInfo {
+            let mut endpoint_count = 0;
+            for api in &category.apis {
+                endpoint_count += api.methods.len();
+            }
+
+            CategoryInfo {
+                id: category.id.clone(),
+                name: category.name.clone(),
+                desc: category.desc.clone(),
+                endpoint_count,
+                children: category.children.iter().map(convert_category).collect(),
+            }
+        }
+
+        self.categories.iter().map(convert_category).collect()
+    }
+}
