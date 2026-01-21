@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Text,
@@ -25,6 +25,7 @@ interface SidebarProps {
   categories: CategoryInfo[];
   selectedId?: string;
   selectedCategoryId?: string;
+  expandedCategoryIds?: Set<string>;
   onSelect: (endpoint: ApiEndpoint) => void;
   onCategorySelect: (category: CategoryInfo) => void;
   onReset: () => void;
@@ -79,6 +80,7 @@ interface CategoryGroupProps {
   allEndpoints: ApiEndpoint[];
   selectedId?: string;
   selectedCategoryId?: string;
+  expandedCategoryIds?: Set<string>;
   onSelect: (endpoint: ApiEndpoint) => void;
   onCategorySelect: (category: CategoryInfo) => void;
   level?: number;
@@ -90,11 +92,19 @@ function CategoryGroup({
   allEndpoints,
   selectedId,
   selectedCategoryId,
+  expandedCategoryIds,
   onSelect,
   onCategorySelect,
   level = 0,
 }: CategoryGroupProps) {
   const [opened, setOpened] = useState(true);
+
+  // Auto-expand when category is in expandedCategoryIds
+  useEffect(() => {
+    if (expandedCategoryIds?.has(category.id)) {
+      setOpened(true);
+    }
+  }, [expandedCategoryIds, category.id]);
 
   const categoryEndpoints = endpoints.filter(
     (ep) => ep.categoryId === category.id
@@ -206,6 +216,7 @@ function CategoryGroup({
               allEndpoints={allEndpoints}
               selectedId={selectedId}
               selectedCategoryId={selectedCategoryId}
+              expandedCategoryIds={expandedCategoryIds}
               onSelect={onSelect}
               onCategorySelect={onCategorySelect}
               level={level + 1}
@@ -432,6 +443,7 @@ export function Sidebar({
   categories,
   selectedId,
   selectedCategoryId,
+  expandedCategoryIds,
   onSelect,
   onCategorySelect,
   onReset,
@@ -591,6 +603,7 @@ export function Sidebar({
                 allEndpoints={endpoints}
                 selectedId={selectedId}
                 selectedCategoryId={selectedCategoryId}
+                expandedCategoryIds={expandedCategoryIds}
                 onSelect={onSelect}
                 onCategorySelect={onCategorySelect}
               />

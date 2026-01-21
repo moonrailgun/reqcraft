@@ -1,4 +1,4 @@
-import { Box, Text, Title, SimpleGrid, Paper, ThemeIcon, Stack, Badge, Group } from '@mantine/core';
+import { Box, Text, Title, SimpleGrid, Paper, ThemeIcon, Stack, Badge, Group, Kbd } from '@mantine/core';
 import {
   IconSend,
   IconCode,
@@ -8,6 +8,7 @@ import {
   IconApi,
   IconSettings,
   IconBookmark,
+  IconCommand,
 } from '@tabler/icons-react';
 
 interface WelcomePageProps {
@@ -179,6 +180,27 @@ export function WelcomePage({ endpointCount, mockMode }: WelcomePageProps) {
             </Paper>
           ))}
         </SimpleGrid>
+
+        {/* Quick Navigation Hint */}
+        <Paper
+          p="md"
+          radius="md"
+          className="w-full"
+          style={{
+            background: 'linear-gradient(135deg, rgba(255, 107, 53, 0.1) 0%, rgba(247, 147, 30, 0.1) 100%)',
+            border: '1px solid var(--color-accent)',
+          }}
+        >
+          <Group justify="center" gap="md">
+            <IconCommand size={20} className="text-accent" />
+            <Group gap={6}>
+              <Text size="sm" c="dimmed">Press</Text>
+              <Kbd>⌘</Kbd>
+              <Kbd>K</Kbd>
+              <Text size="sm" c="dimmed">to quickly search and navigate to any API</Text>
+            </Group>
+          </Group>
+        </Paper>
 
         {/* Footer */}
         <Text size="xs" c="dimmed" className="text-center">

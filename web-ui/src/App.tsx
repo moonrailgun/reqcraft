@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { Sidebar } from './components/Sidebar';
 import { RequestBuilder } from './components/RequestBuilder';
@@ -6,6 +6,7 @@ import { RequestTabs } from './components/RequestTabs';
 import { ResponsePanel } from './components/ResponsePanel';
 import { WelcomePage } from './components/WelcomePage';
 import { CategoryDetailPage } from './components/CategoryDetailPage';
+import { CommandPalette } from './components/CommandPalette';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
@@ -96,6 +97,29 @@ function App() {
 
   const [response, setResponse] = useState<ResponseState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
+
+  // Find all parent category IDs for a given category ID
+  const findCategoryPath = useCallback((categoryId: string, cats: CategoryInfo[], path: string[] = []): string[] | null => {
+    for (const cat of cats) {
+      if (cat.id === categoryId) {
+        return [...path, cat.id];
+      }
+      const found = findCategoryPath(categoryId, cat.children, [...path, cat.id]);
+      if (found) return found;
+    }
+    return null;
+  }, []);
+
+  // Compute expanded categories based on selected endpoint
+  const computedExpandedIds = useMemo(() => {
+    if (!selectedEndpoint?.categoryId) return expandedCategoryIds;
+    const path = findCategoryPath(selectedEndpoint.categoryId, categories);
+    if (path) {
+      return new Set([...expandedCategoryIds, ...path]);
+    }
+    return expandedCategoryIds;
+  }, [selectedEndpoint, categories, expandedCategoryIds, findCategoryPath]);
 
   useEffect(() => {
     // Fetch API info to check mock mode and base URLs
@@ -210,6 +234,14 @@ function App() {
       setSelectedEndpoint(endpoint);
       setSelectedCategory(null);
 
+      // Expand parent categories for the selected endpoint
+      if (endpoint.categoryId) {
+        const path = findCategoryPath(endpoint.categoryId, categories);
+        if (path) {
+          setExpandedCategoryIds(prev => new Set([...prev, ...path]));
+        }
+      }
+
       // Extract params fields from request schema
       const paramsFields: KeyValue[] = [];
       if (endpoint.request?.fields) {
@@ -237,7 +269,7 @@ function App() {
       urlParams.set('method', endpoint.method);
       window.history.replaceState(null, '', `?${urlParams.toString()}`);
     },
-    [getFullUrl]
+    [getFullUrl, categories, findCategoryPath]
   );
 
   const handleCategorySelect = useCallback((category: CategoryInfo) => {
@@ -366,6 +398,7 @@ function App() {
 
   return (
     <div className="h-screen bg-bg-primary">
+      <CommandPalette endpoints={endpoints} onSelect={handleSelectEndpoint} />
       <PanelGroup orientation="horizontal" className="h-full">
         {/* Sidebar Panel */}
         <Panel defaultSize="20%" minSize="15%" maxSize="40%">
@@ -374,6 +407,7 @@ function App() {
             categories={categories}
             selectedId={selectedEndpoint?.id}
             selectedCategoryId={selectedCategory?.id}
+            expandedCategoryIds={computedExpandedIds}
             onSelect={handleSelectEndpoint}
             onCategorySelect={handleCategorySelect}
             onReset={handleReset}
