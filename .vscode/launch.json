@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run RQC Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extensions/reqcraft-vscode"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/extensions/reqcraft-vscode/out/**/*.js"
+      ],
+      "preLaunchTask": "watch-extension"
+    },
+    {
+      "name": "Run RQC Extension (No Build)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extensions/reqcraft-vscode"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/extensions/reqcraft-vscode/out/**/*.js"
+      ]
+    }
+  ]
+}

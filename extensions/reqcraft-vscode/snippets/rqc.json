@@ -1,0 +1,81 @@
+{
+  "Import": {
+    "prefix": "import",
+    "body": ["import \"${1:./path}\""],
+    "description": "Import file"
+  },
+  "Config": {
+    "prefix": "config",
+    "body": ["config {", "\tbaseUrl ${1:http://localhost:3000}", "}"],
+    "description": "Configuration block"
+  },
+  "API": {
+    "prefix": "api",
+    "body": [
+      "api ${1:/path} {",
+      "\t${2|get,post,put,delete,patch|} {",
+      "\t\tname \"${3:API Name}\"",
+      "\t\tresponse {",
+      "\t\t\t$0",
+      "\t\t}",
+      "\t}",
+      "}"
+    ],
+    "description": "API endpoint"
+  },
+  "Category": {
+    "prefix": "category",
+    "body": ["category ${1:name} {", "\tname \"${2:Display Name}\"", "\t$0", "}"],
+    "description": "API category"
+  },
+  "GET": {
+    "prefix": "get",
+    "body": ["get {", "\tname \"${1:Get}\"", "\tresponse {", "\t\t$0", "\t}", "}"],
+    "description": "GET method"
+  },
+  "POST": {
+    "prefix": "post",
+    "body": ["post {", "\tname \"${1:Create}\"", "\trequest {", "\t\t$2", "\t}", "\tresponse {", "\t\t$0", "\t}", "}"],
+    "description": "POST method"
+  },
+  "Request": {
+    "prefix": "request",
+    "body": ["request {", "\t$0", "}"],
+    "description": "Request schema"
+  },
+  "Response": {
+    "prefix": "response",
+    "body": ["response {", "\t$0", "}"],
+    "description": "Response schema"
+  },
+  "Field String": {
+    "prefix": "fstr",
+    "body": ["${1:name} String"],
+    "description": "String field"
+  },
+  "Field Number": {
+    "prefix": "fnum",
+    "body": ["${1:name} Number"],
+    "description": "Number field"
+  },
+  "Field Nested": {
+    "prefix": "fnested",
+    "body": ["${1:name} {", "\t$0", "}"],
+    "description": "Nested object"
+  },
+  "@mock": {
+    "prefix": "@mock",
+    "body": ["@mock(${1:\"value\"})"],
+    "description": "Mock value"
+  },
+  "@example": {
+    "prefix": "@example",
+    "body": ["@example(${1:\"value\"})"],
+    "description": "Example value"
+  },
+  "@params": {
+    "prefix": "@params",
+    "body": ["@params"],
+    "description": "Query parameter"
+  }
+}
