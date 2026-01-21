@@ -22,6 +22,7 @@ impl Parser {
         }
     }
 
+    #[allow(dead_code)]
     pub fn parse_file(path: &Path) -> Result<RqcConfig, ParseError> {
         let content = fs::read_to_string(path)?;
         let mut parser = Parser::new(&content);

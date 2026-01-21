@@ -8,7 +8,7 @@ use parser::{Parser, RqcConfig};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::info;
+use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const RQC_FILE: &str = ".rqc";
@@ -41,7 +41,7 @@ fn init_project() -> Result<(), Box<dyn std::error::Error>> {
     let rqc_path = Path::new(RQC_FILE);
 
     if rqc_path.exists() {
-        println!("⚠️  {} already exists", RQC_FILE);
+        warn!("{} already exists", RQC_FILE);
         return Ok(());
     }
 
@@ -86,8 +86,8 @@ api /api/posts {
 }
 "#;
     fs::write(rqc_path, example)?;
-    println!("✅ Created {} file with example config", RQC_FILE);
-    println!("   Run 'rqc dev' to start the development server");
+    info!("Created {} file with example config", RQC_FILE);
+    info!("Run 'rqc dev' to start the development server");
 
     Ok(())
 }
@@ -100,7 +100,7 @@ async fn dev_server(
     let rqc_path = Path::new(RQC_FILE);
 
     if !rqc_path.exists() {
-        println!("❌ {} not found. Run 'rqc init' first.", RQC_FILE);
+        error!("{} not found. Run 'rqc init' first.", RQC_FILE);
         return Ok(());
     }
 
@@ -108,13 +108,11 @@ async fn dev_server(
     let base_dir = rqc_path.parent().unwrap_or(Path::new("."));
     let config = parse_with_imports(rqc_path, base_dir)?;
 
-    info!("Loaded {} file with {} APIs", RQC_FILE, config.apis.len());
-
     let endpoints = config.to_endpoints();
-    println!("📦 Loaded {} API endpoints", endpoints.len());
+    info!("Loaded {} API endpoints from {}", endpoints.len(), RQC_FILE);
 
     if mock_mode {
-        println!("🎭 Mock mode enabled");
+        info!("Mock mode enabled");
     }
 
     web::start_server(host, port, config, mock_mode).await?;
@@ -157,14 +155,13 @@ fn parse_file_recursive(
 
         // Check if it's a remote URL
         if openapi::is_url(import_path_clean) {
-            info!("Importing OpenAPI from URL: {}", import_path_clean);
             match openapi::parse_openapi_url(import_path_clean) {
                 Ok(imported_config) => {
-                    println!("🌐 Loaded OpenAPI from URL: {}", import_path_clean);
+                    info!("Loaded OpenAPI from URL: {}", import_path_clean);
                     merge_configs(&mut config, imported_config);
                 }
                 Err(e) => {
-                    println!("⚠️  Failed to fetch OpenAPI {}: {}", import_path_clean, e);
+                    warn!("Failed to fetch OpenAPI {}: {}", import_path_clean, e);
                 }
             }
             continue;
@@ -174,7 +171,7 @@ fn parse_file_recursive(
         let import_file = resolve_import_path(&import_path, base_dir, file_path);
 
         if !import_file.exists() {
-            println!("⚠️  Import not found: {}", import_path);
+            warn!("Import not found: {}", import_path);
             continue;
         }
 
@@ -185,25 +182,22 @@ fn parse_file_recursive(
 
         match ext {
             "rqc" => {
-                info!("Importing RQC file: {:?}", import_file);
+                info!("Importing RQC file: {}", import_path);
                 let import_base = import_file.parent().unwrap_or(base_dir);
                 let imported_config = parse_file_recursive(&import_file, import_base, visited)?;
                 merge_configs(&mut config, imported_config);
             }
-            "json" | "yaml" | "yml" => {
-                info!("Importing OpenAPI file: {:?}", import_file);
-                match openapi::parse_openapi_file(&import_file) {
-                    Ok(imported_config) => {
-                        println!("📄 Loaded OpenAPI: {}", import_path);
-                        merge_configs(&mut config, imported_config);
-                    }
-                    Err(e) => {
-                        println!("⚠️  Failed to parse OpenAPI {}: {}", import_path, e);
-                    }
+            "json" | "yaml" | "yml" => match openapi::parse_openapi_file(&import_file) {
+                Ok(imported_config) => {
+                    info!("Loaded OpenAPI file: {}", import_path);
+                    merge_configs(&mut config, imported_config);
                 }
-            }
+                Err(e) => {
+                    warn!("Failed to parse OpenAPI {}: {}", import_path, e);
+                }
+            },
             _ => {
-                println!("⚠️  Unsupported import format: {}", import_path);
+                warn!("Unsupported import format: {}", import_path);
             }
         }
     }

@@ -66,8 +66,7 @@ pub async fn start_server(
     let app = app.fallback(static_handler).layer(cors).with_state(state);
 
     let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
-    info!("Starting server at http://{}", addr);
-    println!("🚀 ReqCraft dev server running at http://{}", addr);
+    info!("ReqCraft dev server running at http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
