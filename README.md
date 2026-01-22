@@ -20,7 +20,7 @@ A powerful API testing tool powered by DSL configuration.
 ### Quick Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moonrailgun/reqcraft/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/moonrailgun/reqcraft/master/install.sh | bash
 ```
 
 ### Manual Installation

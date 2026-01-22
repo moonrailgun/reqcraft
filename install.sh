@@ -2,7 +2,7 @@
 set -e
 
 # ReqCraft Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/moonrailgun/reqcraft/main/install.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/moonrailgun/reqcraft/master/install.sh | bash
 
 REPO="moonrailgun/reqcraft"
 BINARY_NAME="reqcraft"
@@ -15,10 +15,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-success() { echo -e "${GREEN}[OK]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+info() { echo -e "${BLUE}[INFO]${NC} $1" >&2; }
+success() { echo -e "${GREEN}[OK]${NC} $1" >&2; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
+error() { echo -e "${RED}[ERROR]${NC} $1" >&2; exit 1; }
 
 # Detect OS and architecture
 detect_platform() {
@@ -98,7 +98,7 @@ download_binary() {
   esac
 
   # Find the binary
-  BINARY_PATH=$(find "$TMP_DIR" -name "$BINARY_NAME" -o -name "$BINARY_NAME.exe" | head -1)
+  BINARY_PATH=$(find "$TMP_DIR" -type f \( -name "$BINARY_NAME" -o -name "$BINARY_NAME.exe" \) | head -1)
 
   if [ -z "$BINARY_PATH" ]; then
     error "Binary not found in archive"
