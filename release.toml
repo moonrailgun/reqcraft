@@ -2,8 +2,7 @@
 # Install: cargo install cargo-release
 # Usage: cargo release patch/minor/major
 
-[workspace]
-# Allow single crate release
+# Allow release from these branches
 allow-branch = ["main", "master"]
 
 # Commit message template
