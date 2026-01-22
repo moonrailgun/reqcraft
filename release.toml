@@ -1,0 +1,26 @@
+# cargo-release configuration
+# Install: cargo install cargo-release
+# Usage: cargo release patch/minor/major
+
+[workspace]
+# Allow single crate release
+allow-branch = ["main", "master"]
+
+# Commit message template
+pre-release-commit-message = "chore: release v{{version}}"
+
+# Tag configuration
+tag-message = "Release {{version}}"
+tag-name = "v{{version}}"
+tag = true
+
+# Push after release
+push = true
+push-remote = "origin"
+
+# Publish to crates.io (set to false if not publishing)
+publish = false
+
+# Sign commits and tags (optional)
+sign-commit = false
+sign-tag = false
