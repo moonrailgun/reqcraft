@@ -210,3 +210,25 @@ category a {
   }
 }
 ```
+
+### Websocket 支持
+
+同时支持websocket 事件，格式参考
+
+```
+ws https://echo.websocket.org/ {
+  event foo {
+    request {
+      foo String
+      bar Number
+    }
+    
+    response {
+      foo String
+      bar Number
+    }
+  }
+  
+  event bar { }
+}
+```
