@@ -8,7 +8,7 @@ import { WelcomePage } from './components/WelcomePage';
 import { CategoryDetailPage } from './components/CategoryDetailPage';
 import { CommandPalette } from './components/CommandPalette';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
 
 export interface KeyValue {
   key: string;
@@ -33,15 +33,23 @@ export interface ResponseState {
   size: number;
 }
 
+export interface WsEvent {
+  name: string;
+  request?: SchemaBlock;
+  response?: SchemaBlock;
+}
+
 export interface ApiEndpoint {
   id: string;
+  endpointType: 'http' | 'websocket';
   path: string;
   fullUrl: string | null;
-  method: string;
+  method: string | null;
   name?: string;
   description?: string;
   request?: SchemaBlock;
   response?: SchemaBlock;
+  events?: WsEvent[];
   categoryId?: string;
   categoryName?: string;
 }
@@ -96,6 +104,9 @@ function App() {
   });
 
   const [response, setResponse] = useState<ResponseState | null>(null);
+  const [wsMessages, setWsMessages] = useState<{ type: 'sent' | 'received', data: string, time: number, event?: string }[]>([]);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
 
@@ -254,22 +265,32 @@ function App() {
       }
       paramsFields.push({ key: '', value: '', enabled: true });
 
+      const method = endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method as HttpMethod);
+
       setRequest({
-        method: endpoint.method as HttpMethod,
-        url: getFullUrl(endpoint.path),
+        method,
+        url: endpoint.endpointType === 'websocket' ? endpoint.path : getFullUrl(endpoint.path),
         params: paramsFields,
         headers: [{ key: '', value: '', enabled: true }],
         body: '',
       });
       setResponse(null);
+      setWsMessages([]);
+      if (socket) {
+        socket.close();
+        setSocket(null);
+        setWsConnected(false);
+      }
 
       // Update URL with path and method
       const urlParams = new URLSearchParams();
       urlParams.set('path', endpoint.path);
-      urlParams.set('method', endpoint.method);
+      if (endpoint.method) {
+        urlParams.set('method', endpoint.method);
+      }
       window.history.replaceState(null, '', `?${urlParams.toString()}`);
     },
-    [getFullUrl, categories, findCategoryPath]
+    [getFullUrl, categories, findCategoryPath, socket]
   );
 
   const handleCategorySelect = useCallback((category: CategoryInfo) => {
@@ -319,6 +340,42 @@ function App() {
 
   const handleSend = async (useMock: boolean = false) => {
     if (!request.url && !useMock) return;
+
+    if (request.method === 'WS') {
+      if (wsConnected) {
+        socket?.close();
+        setWsConnected(false);
+        setSocket(null);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const ws = new WebSocket(request.url);
+        ws.onopen = () => {
+          setWsConnected(true);
+          setLoading(false);
+          setSocket(ws);
+          setWsMessages(prev => [...prev, { type: 'received', data: 'Connected to ' + request.url, time: Date.now() }]);
+        };
+        ws.onmessage = (event) => {
+          setWsMessages(prev => [...prev, { type: 'received', data: event.data, time: Date.now() }]);
+        };
+        ws.onclose = () => {
+          setWsConnected(false);
+          setSocket(null);
+          setWsMessages(prev => [...prev, { type: 'received', data: 'Disconnected', time: Date.now() }]);
+        };
+        ws.onerror = (error) => {
+          setWsMessages(prev => [...prev, { type: 'received', data: 'WebSocket Error: ' + error, time: Date.now() }]);
+          setLoading(false);
+        };
+      } catch (err) {
+        setWsMessages(prev => [...prev, { type: 'received', data: 'Error: ' + (err instanceof Error ? err.message : String(err)), time: Date.now() }]);
+        setLoading(false);
+      }
+      return;
+    }
 
     setLoading(true);
     const startTime = Date.now();
@@ -396,6 +453,13 @@ function App() {
     }
   };
 
+  const handleSendEvent = useCallback((eventName: string, data: string) => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(data);
+      setWsMessages(prev => [...prev, { type: 'sent', data, time: Date.now(), event: eventName }]);
+    }
+  }, [socket]);
+
   return (
     <div className="h-screen bg-bg-primary">
       <CommandPalette endpoints={endpoints} onSelect={handleSelectEndpoint} />
@@ -430,8 +494,8 @@ function App() {
                   url={request.url}
                   onUrlChange={(url) => setRequest({ ...request, url })}
                   onSend={() => handleSend(false)}
-                  onMockSend={mockMode && selectedEndpoint ? () => handleSend(true) : undefined}
-                  loading={loading}
+                  onMockSend={mockMode && selectedEndpoint && selectedEndpoint.endpointType === 'http' ? () => handleSend(true) : undefined}
+                  loading={loading || (request.method === 'WS' && !wsConnected && !!socket)}
                 />
 
                 <PanelGroup orientation="horizontal" className="flex-1">
@@ -461,6 +525,8 @@ function App() {
                         onHeadersChange={(headers) => setRequest({ ...request, headers })}
                         onBodyChange={(body) => setRequest({ ...request, body })}
                         requestSchema={selectedEndpoint?.request}
+                        wsEvents={selectedEndpoint?.events}
+                        onSendEvent={handleSendEvent}
                       />
                     </div>
                   </Panel>
@@ -470,7 +536,13 @@ function App() {
                   {/* Response Panel */}
                   <Panel defaultSize="50%" minSize="25%">
                     <div className="h-full flex flex-col">
-                      <ResponsePanel response={response} loading={loading} />
+                      <ResponsePanel 
+                        response={response} 
+                        loading={loading} 
+                        isWs={request.method === 'WS'}
+                        wsMessages={wsMessages}
+                        wsConnected={wsConnected}
+                      />
                     </div>
                   </Panel>
                 </PanelGroup>

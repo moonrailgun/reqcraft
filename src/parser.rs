@@ -59,6 +59,9 @@ impl Parser {
                 "api" => {
                     config.apis.push(self.parse_api_block()?);
                 }
+                "ws" => {
+                    config.ws_apis.push(self.parse_ws_block()?);
+                }
                 "import" => {
                     config.imports.push(self.parse_import()?);
                 }
@@ -143,6 +146,97 @@ impl Parser {
 
         self.expect(lexer::TokenType::RBrace)?;
         Ok(api)
+    }
+
+    fn parse_ws_block(&mut self) -> Result<WsBlock, ParseError> {
+        self.next_token(); // skip 'ws'
+
+        let url = self.current_token.literal.clone();
+        self.next_token();
+
+        self.expect(lexer::TokenType::LBrace)?;
+
+        let mut ws = WsBlock {
+            url,
+            events: Vec::new(),
+            name: None,
+            description: None,
+        };
+
+        let mut pending_doc_comment: Option<String> = None;
+
+        while self.current_token.token_type != lexer::TokenType::RBrace {
+            // Capture doc comments
+            if self.current_token.token_type == lexer::TokenType::DocComment {
+                pending_doc_comment = Some(self.current_token.literal.clone());
+                self.next_token();
+                continue;
+            }
+
+            match self.current_token.literal.as_str() {
+                "name" => {
+                    self.next_token();
+                    if self.current_token.token_type == lexer::TokenType::String {
+                        ws.name = Some(self.current_token.literal.clone());
+                        self.next_token();
+                    }
+                }
+                "event" => {
+                    let mut event = self.parse_ws_event()?;
+                    // Assign pending doc comment to event description if we add description to event
+                    // For now, events don't have description in AST, so we just clear it or handle it if needed
+                    pending_doc_comment = None;
+                    ws.events.push(event);
+                }
+                _ => {
+                    self.next_token();
+                }
+            }
+        }
+
+        self.expect(lexer::TokenType::RBrace)?;
+
+        // If there was a doc comment before ws block (though not easily supported by this simple parser loop),
+        // we could assign it. For now, let's just make sure we handle it.
+        if ws.description.is_none() {
+            ws.description = pending_doc_comment;
+        }
+
+        Ok(ws)
+    }
+
+    fn parse_ws_event(&mut self) -> Result<WsEvent, ParseError> {
+        self.next_token(); // skip 'event'
+
+        let name = self.current_token.literal.clone();
+        self.next_token();
+
+        self.expect(lexer::TokenType::LBrace)?;
+
+        let mut event = WsEvent {
+            name,
+            request: None,
+            response: None,
+        };
+
+        while self.current_token.token_type != lexer::TokenType::RBrace {
+            match self.current_token.literal.as_str() {
+                "request" => {
+                    self.next_token();
+                    event.request = Some(self.parse_schema_block()?);
+                }
+                "response" => {
+                    self.next_token();
+                    event.response = Some(self.parse_schema_block()?);
+                }
+                _ => {
+                    self.next_token();
+                }
+            }
+        }
+
+        self.expect(lexer::TokenType::RBrace)?;
+        Ok(event)
     }
 
     fn parse_method_block(&mut self) -> Result<MethodBlock, ParseError> {
@@ -376,6 +470,9 @@ impl Parser {
                 }
                 "api" => {
                     category.apis.push(self.parse_api_block()?);
+                }
+                "ws" => {
+                    category.ws_apis.push(self.parse_ws_block()?);
                 }
                 "category" => {
                     category.children.push(self.parse_category_block(counter)?);

@@ -19,6 +19,7 @@ const methodColors: Record<string, string> = {
   PUT: 'yellow',
   DELETE: 'red',
   PATCH: 'teal',
+  WS: 'violet',
 };
 
 export function CategoryDetailPage({
@@ -115,11 +116,11 @@ export function CategoryDetailPage({
                   <Group justify="space-between">
                     <Group gap="md">
                       <Badge
-                        color={methodColors[endpoint.method] || 'gray'}
+                        color={methodColors[endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method || 'GET')] || 'gray'}
                         variant="filled"
                         size="sm"
                       >
-                        {endpoint.method}
+                        {endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method || 'GET')}
                       </Badge>
                       <Box>
                         <Text size="sm" fw={500}>

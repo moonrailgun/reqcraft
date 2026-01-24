@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
-use crate::parser::{ApiEndpoint, CategoryInfo, FieldType, MockValue, RqcConfig, SchemaBlock};
+use crate::parser::{ApiEndpoint, CategoryInfo, EndpointType, FieldType, MockValue, RqcConfig, SchemaBlock};
 
 #[derive(Embed)]
 #[folder = "web-ui/dist"]
@@ -135,7 +135,10 @@ async fn mock_handler(
     // Find matching API endpoint from flattened endpoints list
     let endpoints = state.config.to_endpoints();
     for endpoint in &endpoints {
-        if endpoint.path == request_path && endpoint.method == method.as_str() {
+        if endpoint.endpoint_type == EndpointType::Http
+            && endpoint.path == request_path
+            && endpoint.method.as_deref() == Some(method.as_str())
+        {
             // Found matching endpoint, generate mock response
             if let Some(ref response_schema) = endpoint.response {
                 let mock_data = generate_mock_response(response_schema);

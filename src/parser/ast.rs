@@ -10,7 +10,30 @@ pub struct RqcConfig {
     #[serde(default)]
     pub apis: Vec<ApiBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ws_apis: Vec<WsBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub categories: Vec<CategoryBlock>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WsBlock {
+    pub url: String,
+    pub events: Vec<WsEvent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WsEvent {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response: Option<SchemaBlock>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +48,8 @@ pub struct CategoryBlock {
     pub prefix: Option<String>,
     #[serde(default)]
     pub apis: Vec<ApiBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ws_apis: Vec<WsBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<CategoryBlock>,
 }
@@ -102,14 +127,23 @@ pub enum MockValue {
     Boolean(bool),
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum EndpointType {
+    Http,
+    Websocket,
+}
+
 // Flattened API representation for Web UI
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiEndpoint {
     pub id: String,
+    pub endpoint_type: EndpointType,
     pub path: String,
     pub full_url: Option<String>,
-    pub method: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub method: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,6 +152,8 @@ pub struct ApiEndpoint {
     pub request: Option<SchemaBlock>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub response: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub events: Option<Vec<WsEvent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -149,7 +185,7 @@ impl RqcConfig {
         let mut endpoints = Vec::new();
         let mut id_counter = 0;
 
-        // Process top-level APIs (no category)
+        // Process top-level HTTP APIs
         for api in &self.apis {
             for method in &api.methods {
                 id_counter += 1;
@@ -159,17 +195,38 @@ impl RqcConfig {
 
                 endpoints.push(ApiEndpoint {
                     id: format!("api-{}", id_counter),
+                    endpoint_type: EndpointType::Http,
                     path: api.path.clone(),
                     full_url,
-                    method: method.method.clone(),
+                    method: Some(method.method.clone()),
                     name: method.name.clone(),
                     description: method.description.clone(),
                     request: method.request.clone(),
                     response: method.response.clone(),
+                    events: None,
                     category_id: None,
                     category_name: None,
                 });
             }
+        }
+
+        // Process top-level WebSocket APIs
+        for ws in &self.ws_apis {
+            id_counter += 1;
+            endpoints.push(ApiEndpoint {
+                id: format!("ws-{}", id_counter),
+                endpoint_type: EndpointType::Websocket,
+                path: ws.url.clone(),
+                full_url: Some(ws.url.clone()),
+                method: None,
+                name: ws.name.clone(),
+                description: ws.description.clone(),
+                request: None,
+                response: None,
+                events: Some(ws.events.clone()),
+                category_id: None,
+                category_name: None,
+            });
         }
 
         // Process categories recursively
@@ -186,7 +243,7 @@ impl RqcConfig {
                 prefix_stack.to_string()
             };
 
-            // Process APIs in this category
+            // Process HTTP APIs in this category
             for api in &category.apis {
                 for method in &api.methods {
                     *id_counter += 1;
@@ -197,17 +254,38 @@ impl RqcConfig {
 
                     endpoints.push(ApiEndpoint {
                         id: format!("api-{}", id_counter),
+                        endpoint_type: EndpointType::Http,
                         path: full_path,
                         full_url,
-                        method: method.method.clone(),
+                        method: Some(method.method.clone()),
                         name: method.name.clone(),
                         description: method.description.clone(),
                         request: method.request.clone(),
                         response: method.response.clone(),
+                        events: None,
                         category_id: Some(category.id.clone()),
                         category_name: category.name.clone(),
                     });
                 }
+            }
+
+            // Process WebSocket APIs in this category
+            for ws in &category.ws_apis {
+                *id_counter += 1;
+                endpoints.push(ApiEndpoint {
+                    id: format!("ws-{}", id_counter),
+                    endpoint_type: EndpointType::Websocket,
+                    path: ws.url.clone(),
+                    full_url: Some(ws.url.clone()),
+                    method: None,
+                    name: ws.name.clone(),
+                    description: ws.description.clone(),
+                    request: None,
+                    response: None,
+                    events: Some(ws.events.clone()),
+                    category_id: Some(category.id.clone()),
+                    category_name: category.name.clone(),
+                });
             }
 
             // Process nested categories
@@ -229,6 +307,7 @@ impl RqcConfig {
             for api in &category.apis {
                 endpoint_count += api.methods.len();
             }
+            endpoint_count += category.ws_apis.len();
 
             CategoryInfo {
                 id: category.id.clone(),

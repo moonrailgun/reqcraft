@@ -9,9 +9,14 @@ import {
   Badge,
   Tooltip,
 } from '@mantine/core';
-import { IconX, IconFileImport } from '@tabler/icons-react';
+import {
+  IconX,
+  IconFileImport,
+  IconSend,
+  IconMessage,
+} from '@tabler/icons-react';
 import Editor from '@monaco-editor/react';
-import type { KeyValue, SchemaBlock, Field } from '../App';
+import type { KeyValue, SchemaBlock, Field, WsEvent } from '../App';
 
 interface RequestTabsProps {
   params: KeyValue[];
@@ -22,6 +27,8 @@ interface RequestTabsProps {
   onHeadersChange: (headers: KeyValue[]) => void;
   onBodyChange: (body: string) => void;
   requestSchema?: SchemaBlock;
+  wsEvents?: WsEvent[];
+  onSendEvent?: (eventName: string, data: string) => void;
 }
 
 const METHODS_WITH_BODY = ['POST', 'PUT', 'PATCH'];
@@ -74,8 +81,12 @@ export function RequestTabs({
   onHeadersChange,
   onBodyChange,
   requestSchema,
+  wsEvents,
+  onSendEvent,
 }: RequestTabsProps) {
   const showBodyTab = METHODS_WITH_BODY.includes(method.toUpperCase());
+  const isWs = method.toUpperCase() === 'WS';
+
   const hasExample = useMemo(() => {
     if (!requestSchema?.fields) return false;
     return requestSchema.fields.some((f) => f.example !== undefined);
@@ -85,6 +96,12 @@ export function RequestTabs({
     if (!requestSchema) return;
     const exampleData = generateExampleFromSchema(requestSchema);
     onBodyChange(JSON.stringify(exampleData, null, 2));
+  };
+
+  const handleSendWsEvent = (event: WsEvent) => {
+    if (!onSendEvent) return;
+    const data = event.request ? JSON.stringify(generateExampleFromSchema(event.request), null, 2) : '{}';
+    onSendEvent(event.name, data);
   };
   const updateKeyValue = (
     items: KeyValue[],
@@ -229,6 +246,16 @@ export function RequestTabs({
           )}
         </Tabs.Tab>
         {showBodyTab && <Tabs.Tab value="body">Body</Tabs.Tab>}
+        {isWs && (
+          <Tabs.Tab value="events">
+            Events
+            {wsEvents && wsEvents.length > 0 && (
+              <Badge size="xs" color="violet" ml={6}>
+                {wsEvents.length}
+              </Badge>
+            )}
+          </Tabs.Tab>
+        )}
       </Tabs.List>
 
       <Tabs.Panel value="params" className="overflow-auto bg-bg-primary">
@@ -280,6 +307,59 @@ export function RequestTabs({
               }}
             />
           </Box>
+        </Tabs.Panel>
+      )}
+
+      {isWs && (
+        <Tabs.Panel value="events" className="overflow-auto bg-bg-primary">
+          <Table className="w-full">
+            <Table.Thead>
+              <Table.Tr className="border-b border-border">
+                <Table.Th className="text-text-secondary font-medium px-4">Event Name</Table.Th>
+                <Table.Th className="text-text-secondary font-medium">Schema</Table.Th>
+                <Table.Th w={80} />
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {wsEvents?.map((event) => (
+                <Table.Tr key={event.name} className="border-b border-border hover:bg-bg-hover">
+                  <Table.Td className="px-4">
+                    <Group gap="xs">
+                      <IconMessage size={14} color="var(--color-accent-violet)" />
+                      <Text size="sm" fw={500}>{event.name}</Text>
+                    </Group>
+                  </Table.Td>
+                  <Table.Td>
+                    {event.request && (
+                      <Badge size="xs" variant="outline" color="gray">Request</Badge>
+                    )}
+                    {event.response && (
+                      <Badge size="xs" variant="outline" color="blue" ml={4}>Response</Badge>
+                    )}
+                  </Table.Td>
+                  <Table.Td>
+                    <Tooltip label="Send Event">
+                      <ActionIcon
+                        variant="light"
+                        color="violet"
+                        size="sm"
+                        onClick={() => handleSendWsEvent(event)}
+                      >
+                        <IconSend size={14} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+              {(!wsEvents || wsEvents.length === 0) && (
+                <Table.Tr>
+                  <Table.Td colSpan={3} className="text-center py-8">
+                    <Text size="sm" c="dimmed">No events defined</Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
         </Tabs.Panel>
       )}
     </Tabs>

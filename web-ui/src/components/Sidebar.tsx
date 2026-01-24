@@ -41,6 +41,7 @@ const methodStyles: Record<string, { bg: string; text: string }> = {
   PUT: { bg: 'rgba(234, 179, 8, 0.15)', text: '#facc15' },
   DELETE: { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171' },
   PATCH: { bg: 'rgba(20, 184, 166, 0.15)', text: '#2dd4bf' },
+  WS: { bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa' },
 };
 
 interface TreeItemProps {
@@ -242,7 +243,8 @@ function EndpointItem({
   level = 0,
 }: EndpointItemProps) {
   const isSelected = selectedId === endpoint.id;
-  const methodStyle = methodStyles[endpoint.method] || {
+  const displayMethod = endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method || 'GET');
+  const methodStyle = methodStyles[displayMethod] || {
     bg: 'rgba(156, 163, 175, 0.15)',
     text: '#9ca3af',
   };
@@ -298,7 +300,7 @@ function EndpointItem({
                   fontSize: 10,
                 }}
               >
-                {endpoint.method}
+                {displayMethod}
               </Text>
             </Box>
             <Text

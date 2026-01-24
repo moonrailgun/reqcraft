@@ -17,6 +17,7 @@ const methodColors: Record<HttpMethod, string> = {
   PUT: 'yellow',
   DELETE: 'red',
   PATCH: 'teal',
+  WS: 'violet',
 };
 
 export function RequestBuilder({
@@ -27,6 +28,8 @@ export function RequestBuilder({
   onMockSend,
   loading,
 }: RequestBuilderProps) {
+  const isWs = method === 'WS';
+
   return (
     <Box className="bg-bg-secondary border-b border-border p-4">
       <Group gap="sm">
@@ -51,7 +54,7 @@ export function RequestBuilder({
         <TextInput
           value={url}
           onChange={(e) => onUrlChange(e.target.value)}
-          placeholder="Enter request URL"
+          placeholder={isWs ? "Enter WebSocket URL" : "Enter request URL"}
           flex={1}
           onKeyDown={(e) => {
             if (e.key === 'Enter') onSend();
@@ -71,7 +74,7 @@ export function RequestBuilder({
         <Button
           onClick={onSend}
           disabled={loading || !url}
-          color="orange"
+          color={isWs ? "violet" : "orange"}
           leftSection={
             loading ? (
               <IconLoader2 size={16} className="animate-spin" />
@@ -80,7 +83,7 @@ export function RequestBuilder({
             )
           }
         >
-          {loading ? 'Sending...' : 'Send'}
+          {loading ? (isWs ? 'Connecting...' : 'Sending...') : (isWs ? 'Connect' : 'Send')}
         </Button>
 
         {onMockSend && (

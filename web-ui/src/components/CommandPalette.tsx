@@ -14,6 +14,7 @@ const METHOD_COLORS: Record<string, string> = {
   PUT: '#f59e0b',
   DELETE: '#ef4444',
   PATCH: '#a855f7',
+  WS: '#a78bfa',
 };
 
 function fuzzyMatch(text: string, query: string): boolean {
@@ -217,12 +218,12 @@ export function CommandPalette({ endpoints, onSelect }: CommandPaletteProps) {
                       radius="sm"
                       variant="light"
                       style={{
-                        backgroundColor: `${METHOD_COLORS[endpoint.method]}20`,
-                        color: METHOD_COLORS[endpoint.method],
+                        backgroundColor: `${METHOD_COLORS[endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method || 'GET')]}20`,
+                        color: METHOD_COLORS[endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method || 'GET')],
                         minWidth: 60,
                       }}
                     >
-                      {endpoint.method}
+                      {endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method || 'GET')}
                     </Badge>
                     <div className="flex-1 min-w-0">
                       <Text
