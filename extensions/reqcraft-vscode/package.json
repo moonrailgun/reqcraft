@@ -5,6 +5,7 @@
   "version": "1.0.0",
   "publisher": "moonrailgun",
   "license": "MIT",
+  "icon": "icons/rqc.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/moonrailgun/reqcraft"
