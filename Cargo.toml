@@ -1,6 +1,6 @@
 [package]
 name = "reqcraft"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 authors = ["moonrailgun"]
 description = "A powerful API testing tool powered by DSL configuration"
