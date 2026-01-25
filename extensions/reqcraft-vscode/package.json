@@ -2,7 +2,7 @@
   "name": "reqcraft",
   "displayName": "ReqCraft",
   "description": "Syntax highlighting and code completion for .rqc files",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "moonrailgun",
   "license": "MIT",
   "icon": "icons/rqc.png",
