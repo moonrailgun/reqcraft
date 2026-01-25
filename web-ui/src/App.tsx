@@ -22,6 +22,7 @@ import {
   saveConfigHeaders,
   mergeConfigHeaders,
 } from './utils/variables';
+import { generateExampleFromSchema, hasBodyFields } from './utils/schema';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
 
@@ -293,12 +294,20 @@ function App() {
       }
       paramsFields.push({ key: '', value: '', enabled: true });
 
+      // Generate body example for POST/PUT/PATCH methods
+      const method = selectedEndpoint.method?.toUpperCase() || 'GET';
+      let body = '';
+      if (['POST', 'PUT', 'PATCH'].includes(method) && hasBodyFields(selectedEndpoint.request)) {
+        const exampleData = generateExampleFromSchema(selectedEndpoint.request!);
+        body = JSON.stringify(exampleData, null, 2);
+      }
+
       setRequest({
         method: selectedEndpoint.method as HttpMethod,
         url: getFullUrl(selectedEndpoint.path),
         params: paramsFields,
         headers: [{ key: '', value: '', enabled: true }],
-        body: '',
+        body,
       });
     }
   }, [selectedEndpoint, selectedBaseUrl, request.url, getFullUrl]);
@@ -331,12 +340,19 @@ function App() {
 
       const method = endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method as HttpMethod);
 
+      // Generate body example for POST/PUT/PATCH methods
+      let body = '';
+      if (['POST', 'PUT', 'PATCH'].includes(method) && hasBodyFields(endpoint.request)) {
+        const exampleData = generateExampleFromSchema(endpoint.request!);
+        body = JSON.stringify(exampleData, null, 2);
+      }
+
       setRequest({
         method,
         url: endpoint.endpointType === 'websocket' ? endpoint.path : getFullUrl(endpoint.path),
         params: paramsFields,
         headers: [{ key: '', value: '', enabled: true }],
-        body: '',
+        body,
       });
       setResponse(null);
       setWsMessages([]);

@@ -18,7 +18,8 @@ import {
   IconMessage,
 } from '@tabler/icons-react';
 import Editor from '@monaco-editor/react';
-import type { KeyValue, SchemaBlock, Field, WsEvent } from '../App';
+import type { KeyValue, SchemaBlock, WsEvent } from '../App';
+import { generateExampleFromSchema, hasBodyFields } from '../utils/schema';
 
 interface RequestTabsProps {
   params: KeyValue[];
@@ -34,45 +35,6 @@ interface RequestTabsProps {
 }
 
 const METHODS_WITH_BODY = ['POST', 'PUT', 'PATCH'];
-
-function generateExampleValue(field: Field): unknown {
-  if (field.example !== undefined) {
-    return field.example;
-  }
-
-  // Default values based on type
-  switch (field.fieldType) {
-    case 'string':
-      return '';
-    case 'number':
-      return 0;
-    case 'boolean':
-      return false;
-    case 'array':
-      return [];
-    case 'object':
-      if (field.nested) {
-        return generateExampleFromSchema(field.nested);
-      }
-      return {};
-    default:
-      return '';
-  }
-}
-
-function generateExampleFromSchema(schema: SchemaBlock): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-
-  for (const field of schema.fields) {
-    if (field.nested) {
-      result[field.name] = generateExampleFromSchema(field.nested);
-    } else {
-      result[field.name] = generateExampleValue(field);
-    }
-  }
-
-  return result;
-}
 
 export function RequestTabs({
   params,
@@ -90,8 +52,7 @@ export function RequestTabs({
   const isWs = method.toUpperCase() === 'WS';
 
   const hasExample = useMemo(() => {
-    if (!requestSchema?.fields) return false;
-    return requestSchema.fields.some((f) => f.example !== undefined);
+    return hasBodyFields(requestSchema);
   }, [requestSchema]);
 
   const handleLoadExample = () => {
