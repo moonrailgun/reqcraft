@@ -136,3 +136,31 @@ jobs:
             artifacts/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  vscode-extension:
+    name: Publish VSCode Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: extensions/reqcraft-vscode
+        run: npm ci
+
+      - name: Compile
+        working-directory: extensions/reqcraft-vscode
+        run: npm run compile
+
+      # - name: Publish to VS Code Marketplace
+      #   working-directory: extensions/reqcraft-vscode
+      #   run: npx @vscode/vsce publish -p ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX Registry
+        working-directory: extensions/reqcraft-vscode
+        run: npx ovsx publish -p ${{ secrets.OVSX_PAT }}
