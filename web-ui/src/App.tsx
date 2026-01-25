@@ -7,6 +7,16 @@ import { ResponsePanel } from './components/ResponsePanel';
 import { WelcomePage } from './components/WelcomePage';
 import { CategoryDetailPage } from './components/CategoryDetailPage';
 import { CommandPalette } from './components/CommandPalette';
+import { VariablesPage } from './components/VariablesPage';
+import {
+  type Variable,
+  type VariableDefinition,
+  loadVariables,
+  saveVariables,
+  replaceVariables,
+  replaceVariablesInKeyValues,
+  mergeVariables,
+} from './utils/variables';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
 
@@ -92,6 +102,7 @@ function App() {
   const [categories, setCategories] = useState<CategoryInfo[]>([]);
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryInfo | null>(null);
+  const [variablesSelected, setVariablesSelected] = useState(false);
   const [mockMode, setMockMode] = useState(false);
   const [corsMode, setCorsMode] = useState(false);
   const [baseUrls, setBaseUrls] = useState<string[]>([]);
@@ -111,6 +122,20 @@ function App() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
+  const [variables, setVariables] = useState<Variable[]>(() => loadVariables());
+
+  const handleVariablesChange = useCallback((newVariables: Variable[]) => {
+    setVariables(newVariables);
+    saveVariables(newVariables);
+  }, []);
+
+  const handleVariablesClick = useCallback(() => {
+    setVariablesSelected(true);
+    setSelectedEndpoint(null);
+    setSelectedCategory(null);
+    setResponse(null);
+    window.history.replaceState(null, '', '?variables=1');
+  }, []);
 
   // Find all parent category IDs for a given category ID
   const findCategoryPath = useCallback((categoryId: string, cats: CategoryInfo[], path: string[] = []): string[] | null => {
@@ -158,7 +183,11 @@ function App() {
         const params = new URLSearchParams(window.location.search);
         const path = params.get('path');
         const method = params.get('method');
-        if (path && method) {
+        const variablesParam = params.get('variables');
+        
+        if (variablesParam === '1') {
+          setVariablesSelected(true);
+        } else if (path && method) {
           const endpoint = data.find((e) => e.path === path && e.method === method);
           if (endpoint) {
             setSelectedEndpoint(endpoint);
@@ -190,6 +219,16 @@ function App() {
             setSelectedCategory(category);
           }
         }
+      })
+      .catch(console.error);
+
+    // Fetch config variables and merge with local variables
+    fetch('/api/variables')
+      .then((res) => res.json())
+      .then((configVars: VariableDefinition[]) => {
+        const localVars = loadVariables();
+        const merged = mergeVariables(configVars, localVars);
+        setVariables(merged);
       })
       .catch(console.error);
   }, []);
@@ -247,6 +286,7 @@ function App() {
     (endpoint: ApiEndpoint) => {
       setSelectedEndpoint(endpoint);
       setSelectedCategory(null);
+      setVariablesSelected(false);
 
       // Expand parent categories for the selected endpoint
       if (endpoint.categoryId) {
@@ -299,6 +339,7 @@ function App() {
   const handleCategorySelect = useCallback((category: CategoryInfo) => {
     setSelectedCategory(category);
     setSelectedEndpoint(null);
+    setVariablesSelected(false);
     setRequest({
       method: 'GET',
       url: '',
@@ -330,6 +371,7 @@ function App() {
   const handleReset = useCallback(() => {
     setSelectedEndpoint(null);
     setSelectedCategory(null);
+    setVariablesSelected(false);
     setRequest({
       method: 'GET',
       url: '',
@@ -344,6 +386,12 @@ function App() {
   const handleSend = async (useMock: boolean = false) => {
     if (!request.url && !useMock) return;
 
+    // Apply variable replacements
+    const resolvedUrl = replaceVariables(request.url, variables);
+    const resolvedParams = replaceVariablesInKeyValues(request.params, variables);
+    const resolvedHeaders = replaceVariablesInKeyValues(request.headers, variables);
+    const resolvedBody = replaceVariables(request.body, variables);
+
     if (request.method === 'WS') {
       if (wsConnected) {
         socket?.close();
@@ -354,12 +402,12 @@ function App() {
 
       setLoading(true);
       try {
-        const ws = new WebSocket(request.url);
+        const ws = new WebSocket(resolvedUrl);
         ws.onopen = () => {
           setWsConnected(true);
           setLoading(false);
           setSocket(ws);
-          setWsMessages(prev => [...prev, { type: 'received', data: 'Connected to ' + request.url, time: Date.now() }]);
+          setWsMessages(prev => [...prev, { type: 'received', data: 'Connected to ' + resolvedUrl, time: Date.now() }]);
         };
         ws.onmessage = (event) => {
           setWsMessages(prev => [...prev, { type: 'received', data: event.data, time: Date.now() }]);
@@ -387,17 +435,18 @@ function App() {
       let targetUrl: string;
 
       if (useMock && selectedEndpoint) {
-        // Use mock endpoint with params
-        const mockUrl = new URL(`/mock${selectedEndpoint.path}`, window.location.origin);
-        request.params.forEach((p) => {
+        // Use mock endpoint with params (apply variable replacement to path)
+        const resolvedPath = replaceVariables(selectedEndpoint.path, variables);
+        const mockUrl = new URL(`/mock${resolvedPath}`, window.location.origin);
+        resolvedParams.forEach((p) => {
           if (p.enabled && p.key) {
             mockUrl.searchParams.append(p.key, p.value);
           }
         });
         targetUrl = mockUrl.toString();
       } else {
-        const url = new URL(request.url);
-        request.params.forEach((p) => {
+        const url = new URL(resolvedUrl);
+        resolvedParams.forEach((p) => {
           if (p.enabled && p.key) {
             url.searchParams.append(p.key, p.value);
           }
@@ -413,7 +462,7 @@ function App() {
       }
 
       const headers: Record<string, string> = {};
-      request.headers.forEach((h) => {
+      resolvedHeaders.forEach((h) => {
         if (h.enabled && h.key) {
           headers[h.key] = h.value;
         }
@@ -424,8 +473,8 @@ function App() {
         headers,
       };
 
-      if (['POST', 'PUT', 'PATCH'].includes(request.method) && request.body) {
-        options.body = request.body;
+      if (['POST', 'PUT', 'PATCH'].includes(request.method) && resolvedBody) {
+        options.body = resolvedBody;
         // Auto-add Content-Type for JSON if not specified
         if (!headers['Content-Type'] && !headers['content-type']) {
           headers['Content-Type'] = 'application/json';
@@ -489,6 +538,9 @@ function App() {
             baseUrls={baseUrls}
             selectedBaseUrl={selectedBaseUrl}
             onBaseUrlChange={handleBaseUrlChange}
+            variables={variables}
+            variablesSelected={variablesSelected}
+            onVariablesClick={handleVariablesClick}
           />
         </Panel>
 
@@ -563,6 +615,11 @@ function App() {
                 endpoints={endpoints}
                 onSelectEndpoint={handleSelectEndpoint}
                 onSelectCategory={handleCategorySelect}
+              />
+            ) : variablesSelected ? (
+              <VariablesPage
+                variables={variables}
+                onVariablesChange={handleVariablesChange}
               />
             ) : (
               <WelcomePage endpointCount={endpoints.length} mockMode={mockMode} corsMode={corsMode} />

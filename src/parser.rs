@@ -108,6 +108,9 @@ impl Parser {
                     config.mock = self.current_token.literal == "true";
                     self.next_token();
                 }
+                "variable" => {
+                    config.variables.push(self.parse_variable_definition()?);
+                }
                 _ => {
                     self.next_token();
                 }
@@ -116,6 +119,43 @@ impl Parser {
 
         self.expect(lexer::TokenType::RBrace)?;
         Ok(config)
+    }
+
+    fn parse_variable_definition(&mut self) -> Result<VariableDefinition, ParseError> {
+        self.next_token(); // skip 'variable'
+
+        // Parse variable name
+        let name = self.current_token.literal.clone();
+        self.next_token();
+
+        // Parse variable type (String, Number, etc.)
+        let var_type = self.current_token.literal.clone();
+        self.next_token();
+
+        // Check for default value: default("value")
+        let default_value = if self.current_token.literal == "default" {
+            self.next_token(); // skip 'default'
+            self.expect(lexer::TokenType::LParen)?;
+
+            let value = if self.current_token.token_type == lexer::TokenType::String {
+                self.current_token.literal.clone()
+            } else {
+                // Handle unquoted values (numbers, booleans, identifiers)
+                self.current_token.literal.clone()
+            };
+            self.next_token();
+
+            self.expect(lexer::TokenType::RParen)?;
+            Some(value)
+        } else {
+            None
+        };
+
+        Ok(VariableDefinition {
+            name,
+            var_type,
+            default_value,
+        })
     }
 
     fn parse_api_block(&mut self) -> Result<ApiBlock, ParseError> {

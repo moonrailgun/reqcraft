@@ -17,8 +17,10 @@ import {
   IconFolder,
   IconFolderOpen,
   IconApi,
+  IconVariable,
 } from '@tabler/icons-react';
 import type { ApiEndpoint, CategoryInfo } from '../App';
+import type { Variable } from '../utils/variables';
 
 interface SidebarProps {
   endpoints: ApiEndpoint[];
@@ -33,6 +35,9 @@ interface SidebarProps {
   baseUrls: string[];
   selectedBaseUrl: string;
   onBaseUrlChange: (url: string) => void;
+  variables: Variable[];
+  variablesSelected?: boolean;
+  onVariablesClick: () => void;
 }
 
 const methodStyles: Record<string, { bg: string; text: string }> = {
@@ -453,11 +458,16 @@ export function Sidebar({
   baseUrls,
   selectedBaseUrl,
   onBaseUrlChange,
+  variables,
+  variablesSelected,
+  onVariablesClick,
 }: SidebarProps) {
   const uncategorizedEndpoints = useMemo(
     () => endpoints.filter((ep) => !ep.categoryId),
     [endpoints]
   );
+
+  const activeVariableCount = variables.filter((v) => v.name && v.enabled).length;
 
   return (
     <Box
@@ -563,6 +573,55 @@ export function Sidebar({
               />
             </Box>
           )}
+
+          {/* Variables Section */}
+          <UnstyledButton
+            onClick={onVariablesClick}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '10px 12px',
+              marginBottom: 12,
+              borderRadius: 8,
+              backgroundColor: variablesSelected
+                ? 'rgba(20, 184, 166, 0.15)'
+                : 'rgba(255, 255, 255, 0.03)',
+              border: variablesSelected
+                ? '1px solid rgba(20, 184, 166, 0.3)'
+                : '1px solid rgba(255, 255, 255, 0.06)',
+              transition: 'all 0.15s ease',
+            }}
+            className="hover:bg-[rgba(255,255,255,0.05)]"
+          >
+            <IconVariable
+              size={16}
+              style={{ color: variablesSelected ? '#14b8a6' : 'rgba(255, 255, 255, 0.5)' }}
+            />
+            <Text
+              size="sm"
+              style={{
+                color: variablesSelected ? '#14b8a6' : 'rgba(255, 255, 255, 0.7)',
+                fontWeight: 500,
+                flex: 1,
+              }}
+            >
+              Variables
+            </Text>
+            {activeVariableCount > 0 && (
+              <Badge
+                size="xs"
+                style={{
+                  backgroundColor: 'rgba(20, 184, 166, 0.15)',
+                  color: '#14b8a6',
+                  border: 'none',
+                }}
+              >
+                {activeVariableCount}
+              </Badge>
+            )}
+          </UnstyledButton>
 
           {/* Section Header */}
           <Group
