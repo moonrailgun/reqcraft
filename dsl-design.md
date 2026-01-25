@@ -171,6 +171,78 @@ config {
 }
 ```
 
+### 全局变量
+
+在 config 中可以定义全局变量，这些变量可以在 URL、Headers、Params、Body 等位置使用 `{variableName}` 语法进行引用。
+
+定义变量（类型可选，默认为 String）:
+```
+config {
+  variable workspaceId
+  variable apiVersion
+}
+```
+
+也可以显式指定类型:
+```
+config {
+  variable workspaceId String
+  variable count Number
+}
+```
+
+定义变量（有默认值）:
+```
+config {
+  variable workspaceId default("my-workspace")
+  variable apiVersion String default("v1")
+}
+```
+
+使用变量:
+```
+api /workspace/{workspaceId}/users {
+  get {
+    request {
+      version String @example("{apiVersion}")
+    }
+    response { ... }
+  }
+}
+```
+
+变量在 Web UI 中可以通过侧边栏的 "Variables" 入口进行管理和编辑。配置文件中定义的变量会显示 `from .rqc` 标签，名称不可编辑但值可以覆盖。用户也可以添加自定义变量。
+
+### 全局请求头
+
+在 config 中可以定义全局请求头，这些请求头会自动添加到所有 API 请求中。
+
+定义请求头（无默认值）:
+```
+config {
+  header Authorization
+  header X-API-Key
+}
+```
+
+定义请求头（有默认值）:
+```
+config {
+  header Authorization @default("Bearer your-token")
+  header X-API-Key @default("your-api-key")
+}
+```
+
+请求头的值也支持变量语法:
+```
+config {
+  variable token String default("my-token")
+  header Authorization @default("Bearer {token}")
+}
+```
+
+全局请求头在 Web UI 中可以通过 "Variables" 页面的 "Global Headers" 部分进行管理。配置的请求头会自动添加到所有请求中，请求级别的 Headers 可以覆盖全局请求头。
+
 ### CORS 代理模式
 
 当开发时遇到跨域问题，可以开启 CORS 代理模式。开启后，所有请求会通过本地服务器转发，绕过浏览器的 CORS 限制。

@@ -11,11 +11,16 @@ import { VariablesPage } from './components/VariablesPage';
 import {
   type Variable,
   type VariableDefinition,
+  type HeaderDefinition,
+  type ConfigHeader,
   loadVariables,
   saveVariables,
   replaceVariables,
   replaceVariablesInKeyValues,
   mergeVariables,
+  loadConfigHeaders,
+  saveConfigHeaders,
+  mergeConfigHeaders,
 } from './utils/variables';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
@@ -123,10 +128,16 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [variables, setVariables] = useState<Variable[]>(() => loadVariables());
+  const [configHeaders, setConfigHeaders] = useState<ConfigHeader[]>(() => loadConfigHeaders());
 
   const handleVariablesChange = useCallback((newVariables: Variable[]) => {
     setVariables(newVariables);
     saveVariables(newVariables);
+  }, []);
+
+  const handleConfigHeadersChange = useCallback((newHeaders: ConfigHeader[]) => {
+    setConfigHeaders(newHeaders);
+    saveConfigHeaders(newHeaders);
   }, []);
 
   const handleVariablesClick = useCallback(() => {
@@ -229,6 +240,16 @@ function App() {
         const localVars = loadVariables();
         const merged = mergeVariables(configVars, localVars);
         setVariables(merged);
+      })
+      .catch(console.error);
+
+    // Fetch config headers and merge with saved headers
+    fetch('/api/headers')
+      .then((res) => res.json())
+      .then((configHeaderDefs: HeaderDefinition[]) => {
+        const savedHeaders = loadConfigHeaders();
+        const merged = mergeConfigHeaders(configHeaderDefs, savedHeaders);
+        setConfigHeaders(merged);
       })
       .catch(console.error);
   }, []);
@@ -462,6 +483,15 @@ function App() {
       }
 
       const headers: Record<string, string> = {};
+      
+      // Add config headers first (can be overridden by request headers)
+      configHeaders.forEach((h) => {
+        if (h.enabled && h.name) {
+          headers[h.name] = replaceVariables(h.value, variables);
+        }
+      });
+      
+      // Add request-specific headers (override config headers)
       resolvedHeaders.forEach((h) => {
         if (h.enabled && h.key) {
           headers[h.key] = h.value;
@@ -620,6 +650,8 @@ function App() {
               <VariablesPage
                 variables={variables}
                 onVariablesChange={handleVariablesChange}
+                configHeaders={configHeaders}
+                onConfigHeadersChange={handleConfigHeadersChange}
               />
             ) : (
               <WelcomePage endpointCount={endpoints.length} mockMode={mockMode} corsMode={corsMode} />

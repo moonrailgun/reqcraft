@@ -65,6 +65,8 @@ pub struct ConfigBlock {
     pub mock: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub variables: Vec<VariableDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub headers: Vec<HeaderDefinition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +74,14 @@ pub struct ConfigBlock {
 pub struct VariableDefinition {
     pub name: String,
     pub var_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HeaderDefinition {
+    pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_value: Option<String>,
 }

@@ -11,6 +11,76 @@ export interface VariableDefinition {
   defaultValue?: string;
 }
 
+export interface HeaderDefinition {
+  name: string;
+  defaultValue?: string;
+}
+
+export interface ConfigHeader {
+  name: string;
+  value: string;
+  enabled: boolean;
+  isFromConfig: boolean;
+}
+
+const HEADERS_STORAGE_KEY = 'reqcraft_config_headers';
+
+/**
+ * Load config headers from localStorage
+ */
+export function loadConfigHeaders(): ConfigHeader[] {
+  try {
+    const stored = localStorage.getItem(HEADERS_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Failed to load config headers:', e);
+  }
+  return [];
+}
+
+/**
+ * Save config headers to localStorage
+ */
+export function saveConfigHeaders(headers: ConfigHeader[]): void {
+  try {
+    localStorage.setItem(HEADERS_STORAGE_KEY, JSON.stringify(headers));
+  } catch (e) {
+    console.error('Failed to save config headers:', e);
+  }
+}
+
+/**
+ * Merge config headers with saved headers
+ */
+export function mergeConfigHeaders(
+  configHeaders: HeaderDefinition[],
+  savedHeaders: ConfigHeader[]
+): ConfigHeader[] {
+  const result: ConfigHeader[] = [];
+  const savedMap = new Map(savedHeaders.filter((h) => h.name).map((h) => [h.name, h]));
+
+  for (const configHeader of configHeaders) {
+    const saved = savedMap.get(configHeader.name);
+    if (saved) {
+      result.push({
+        ...saved,
+        isFromConfig: true,
+      });
+    } else {
+      result.push({
+        name: configHeader.name,
+        value: configHeader.defaultValue || '',
+        enabled: true,
+        isFromConfig: true,
+      });
+    }
+  }
+
+  return result;
+}
+
 const VARIABLE_REGEX = /\{(\w+)\}/g;
 
 /**

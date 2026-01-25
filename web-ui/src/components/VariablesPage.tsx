@@ -9,17 +9,21 @@ import {
   Tooltip,
   Group,
 } from '@mantine/core';
-import { IconVariable, IconX } from '@tabler/icons-react';
-import type { Variable } from '../utils/variables';
+import { IconVariable, IconX, IconKey } from '@tabler/icons-react';
+import type { Variable, ConfigHeader } from '../utils/variables';
 
 interface VariablesPageProps {
   variables: Variable[];
   onVariablesChange: (variables: Variable[]) => void;
+  configHeaders: ConfigHeader[];
+  onConfigHeadersChange: (headers: ConfigHeader[]) => void;
 }
 
 export function VariablesPage({
   variables,
   onVariablesChange,
+  configHeaders,
+  onConfigHeadersChange,
 }: VariablesPageProps) {
   const updateVariable = (
     index: number,
@@ -45,9 +49,20 @@ export function VariablesPage({
     onVariablesChange(newVariables);
   };
 
+  const updateHeader = (
+    index: number,
+    field: keyof ConfigHeader,
+    value: string | boolean
+  ) => {
+    const newHeaders = [...configHeaders];
+    newHeaders[index] = { ...newHeaders[index], [field]: value };
+    onConfigHeadersChange(newHeaders);
+  };
+
   const configVariables = variables.filter((v) => v.isFromConfig && v.name);
   const userVariables = variables.filter((v) => !v.isFromConfig);
   const activeCount = variables.filter((v) => v.name && v.enabled).length;
+  const activeHeaderCount = configHeaders.filter((h) => h.name && h.enabled).length;
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-bg-primary">
@@ -71,16 +86,21 @@ export function VariablesPage({
           <Box>
             <Group gap="xs">
               <Text fw={600} size="lg" className="text-text-primary">
-                Variables
+                Variables & Headers
               </Text>
               {activeCount > 0 && (
                 <Badge size="sm" color="teal">
-                  {activeCount} active
+                  {activeCount} vars
+                </Badge>
+              )}
+              {activeHeaderCount > 0 && (
+                <Badge size="sm" color="orange">
+                  {activeHeaderCount} headers
                 </Badge>
               )}
             </Group>
             <Text size="sm" className="text-text-secondary">
-              Define variables to use across all API requests
+              Define variables and headers to use across all API requests
             </Text>
           </Box>
         </Group>
@@ -179,6 +199,91 @@ export function VariablesPage({
                 </Table.Tbody>
               </Table>
             </Box>
+          </Box>
+        )}
+
+        {/* Config Headers Section */}
+        {configHeaders.length > 0 && (
+          <Box mb="xl">
+            <Group gap="xs" mb="sm">
+              <IconKey size={16} style={{ color: 'var(--color-text-secondary)' }} />
+              <Text size="sm" fw={600} className="text-text-secondary uppercase tracking-wide">
+                Global Headers
+              </Text>
+              <Badge size="xs" variant="light" color="orange">
+                from .rqc
+              </Badge>
+            </Group>
+            <Box
+              style={{
+                backgroundColor: 'var(--color-bg-secondary)',
+                borderRadius: 8,
+                border: '1px solid var(--color-border)',
+                overflow: 'hidden',
+              }}
+            >
+              <Table>
+                <Table.Thead>
+                  <Table.Tr className="border-b border-border">
+                    <Table.Th w={50} className="text-text-secondary" />
+                    <Table.Th w={200} className="text-text-secondary font-medium">
+                      Header Name
+                    </Table.Th>
+                    <Table.Th className="text-text-secondary font-medium">
+                      Value
+                    </Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {configHeaders.map((header, idx) => (
+                    <Table.Tr key={idx} className="border-b border-border hover:bg-bg-hover">
+                      <Table.Td>
+                        <Checkbox
+                          checked={header.enabled}
+                          onChange={(e) =>
+                            updateHeader(idx, 'enabled', e.currentTarget.checked)
+                          }
+                          color="orange"
+                          size="sm"
+                        />
+                      </Table.Td>
+                      <Table.Td>
+                        <Text
+                          size="sm"
+                          style={{
+                            fontFamily: 'monospace',
+                            color: 'var(--color-text-primary)',
+                          }}
+                        >
+                          {header.name}
+                        </Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <TextInput
+                          value={header.value}
+                          onChange={(e) =>
+                            updateHeader(idx, 'value', e.target.value)
+                          }
+                          placeholder="Enter header value..."
+                          variant="filled"
+                          size="sm"
+                          styles={{
+                            input: {
+                              backgroundColor: 'var(--color-bg-primary)',
+                              border: '1px solid var(--color-border)',
+                              color: 'var(--color-text-primary)',
+                            },
+                          }}
+                        />
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </Box>
+            <Text size="xs" c="dimmed" mt="xs">
+              These headers will be automatically added to all API requests. Values support variable syntax.
+            </Text>
           </Box>
         )}
 
@@ -285,6 +390,8 @@ export function VariablesPage({
             </Table>
           </Box>
         </Box>
+
+
 
         {/* Usage Hint */}
         <Box

@@ -9,6 +9,31 @@
     "body": ["config {", "\tbaseUrl ${1:http://localhost:3000}", "}"],
     "description": "Configuration block"
   },
+  "Variable": {
+    "prefix": "variable",
+    "body": ["variable ${1:name}${2: ${3|String,Number,Boolean|}}${4: default(\"${5:value}\")}"],
+    "description": "Global variable definition"
+  },
+  "Variable Simple": {
+    "prefix": "var",
+    "body": ["variable ${1:name}"],
+    "description": "Simple variable (String type)"
+  },
+  "Variable with Default": {
+    "prefix": "vard",
+    "body": ["variable ${1:name} default(\"${2:value}\")"],
+    "description": "Variable with default value"
+  },
+  "Header": {
+    "prefix": "header",
+    "body": ["header ${1:Authorization}${2: @default(\"${3:Bearer token}\")}"],
+    "description": "Global header definition"
+  },
+  "Header Simple": {
+    "prefix": "hdr",
+    "body": ["header ${1:Authorization}"],
+    "description": "Simple header definition"
+  },
   "API": {
     "prefix": "api",
     "body": [
@@ -77,5 +102,10 @@
     "prefix": "@params",
     "body": ["@params"],
     "description": "Query parameter"
+  },
+  "@default": {
+    "prefix": "@default",
+    "body": ["@default(\"${1:value}\")"],
+    "description": "Default value for header"
   }
 }

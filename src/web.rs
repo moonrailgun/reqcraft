@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
-use crate::parser::{ApiEndpoint, CategoryInfo, EndpointType, FieldType, MockValue, RqcConfig, SchemaBlock, VariableDefinition};
+use crate::parser::{ApiEndpoint, CategoryInfo, EndpointType, FieldType, HeaderDefinition, MockValue, RqcConfig, SchemaBlock, VariableDefinition};
 
 #[derive(Embed)]
 #[folder = "web-ui/dist"]
@@ -67,7 +67,8 @@ pub async fn start_server(
         .route("/api/config", get(get_config))
         .route("/api/endpoints", get(get_endpoints))
         .route("/api/categories", get(get_categories))
-        .route("/api/variables", get(get_variables));
+        .route("/api/variables", get(get_variables))
+        .route("/api/headers", get(get_headers));
 
     // Add mock proxy endpoint in mock mode
     if mock_mode {
@@ -148,6 +149,17 @@ async fn get_variables(State(state): State<AppState>) -> Json<Vec<VariableDefini
             .config
             .as_ref()
             .map(|c| c.variables.clone())
+            .unwrap_or_default(),
+    )
+}
+
+async fn get_headers(State(state): State<AppState>) -> Json<Vec<HeaderDefinition>> {
+    Json(
+        state
+            .config
+            .config
+            .as_ref()
+            .map(|c| c.headers.clone())
             .unwrap_or_default(),
     )
 }

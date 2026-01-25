@@ -111,6 +111,9 @@ impl Parser {
                 "variable" => {
                     config.variables.push(self.parse_variable_definition()?);
                 }
+                "header" => {
+                    config.headers.push(self.parse_header_definition()?);
+                }
                 _ => {
                     self.next_token();
                 }
@@ -128,9 +131,19 @@ impl Parser {
         let name = self.current_token.literal.clone();
         self.next_token();
 
-        // Parse variable type (String, Number, etc.)
-        let var_type = self.current_token.literal.clone();
-        self.next_token();
+        // Parse variable type (optional, default to "String")
+        // Type is present if the next token is not "default", "variable", "header", "}" etc.
+        let var_type = if self.current_token.literal == "default"
+            || self.current_token.literal == "variable"
+            || self.current_token.literal == "header"
+            || self.current_token.token_type == lexer::TokenType::RBrace
+        {
+            "String".to_string()
+        } else {
+            let t = self.current_token.literal.clone();
+            self.next_token();
+            t
+        };
 
         // Check for default value: default("value")
         let default_value = if self.current_token.literal == "default" {
@@ -154,6 +167,43 @@ impl Parser {
         Ok(VariableDefinition {
             name,
             var_type,
+            default_value,
+        })
+    }
+
+    fn parse_header_definition(&mut self) -> Result<HeaderDefinition, ParseError> {
+        self.next_token(); // skip 'header'
+
+        // Parse header name
+        let name = self.current_token.literal.clone();
+        self.next_token();
+
+        // Check for @default annotation
+        let default_value = if self.current_token.token_type == lexer::TokenType::At {
+            self.next_token(); // skip '@'
+            
+            if self.current_token.literal == "default" {
+                self.next_token(); // skip 'default'
+                self.expect(lexer::TokenType::LParen)?;
+
+                let value = if self.current_token.token_type == lexer::TokenType::String {
+                    self.current_token.literal.clone()
+                } else {
+                    self.current_token.literal.clone()
+                };
+                self.next_token();
+
+                self.expect(lexer::TokenType::RParen)?;
+                Some(value)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(HeaderDefinition {
+            name,
             default_value,
         })
     }

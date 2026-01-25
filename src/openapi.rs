@@ -138,6 +138,7 @@ fn convert_to_rqc(spec: OpenApiSpec) -> Result<RqcConfig, Box<dyn std::error::Er
                 cors: false,
                 mock: false,
                 variables: Vec::new(),
+                headers: Vec::new(),
             });
         }
     }

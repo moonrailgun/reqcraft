@@ -15,6 +15,8 @@ Syntax highlighting and code completion for `.rqc` files.
 
 - `import` - Import other files
 - `config` - Configuration block
+- `variable` - Global variable definition (type optional, defaults to String)
+- `header` - Global header definition
 - `api` - API endpoint definition
 - `category` - Group APIs together
 - `get`, `post`, `put`, `delete`, `patch` - HTTP methods
@@ -32,6 +34,7 @@ Syntax highlighting and code completion for `.rqc` files.
 - `@mock("value")` - Mock value for testing
 - `@example("value")` - Example value
 - `@params` - Mark as URL query parameter
+- `@default("value")` - Default value for headers
 
 ## Installation
 
@@ -64,6 +67,12 @@ import "./openapi.json"
 
 config {
   baseUrl http://localhost:3000
+  
+  variable apiVersion default("v1")
+  variable workspaceId
+  
+  header Authorization @default("Bearer token")
+  header X-API-Key
 }
 
 category user {
