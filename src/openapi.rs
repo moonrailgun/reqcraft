@@ -135,6 +135,8 @@ fn convert_to_rqc(spec: OpenApiSpec) -> Result<RqcConfig, Box<dyn std::error::Er
         if let Some(url) = servers.first().and_then(|s| s.url.clone()) {
             config.config = Some(ConfigBlock {
                 base_urls: vec![url],
+                cors: false,
+                mock: false,
             });
         }
     }
@@ -235,6 +237,7 @@ fn convert_to_rqc(spec: OpenApiSpec) -> Result<RqcConfig, Box<dyn std::error::Er
             desc: None,
             prefix: None,
             apis,
+            ws_apis: Vec::new(),
             children: Vec::new(),
         })
         .collect();
@@ -249,6 +252,7 @@ fn convert_to_rqc(spec: OpenApiSpec) -> Result<RqcConfig, Box<dyn std::error::Er
         desc: Some("Imported from OpenAPI specification".to_string()),
         prefix: None,
         apis: untagged_apis,
+        ws_apis: Vec::new(),
         children,
     });
 

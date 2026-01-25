@@ -59,6 +59,10 @@ pub struct CategoryBlock {
 pub struct ConfigBlock {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub base_urls: Vec<String>,
+    #[serde(default)]
+    pub cors: bool,
+    #[serde(default)]
+    pub mock: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

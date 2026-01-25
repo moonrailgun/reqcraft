@@ -1,7 +1,7 @@
 use axum::{
     body::Body,
     extract::{Path, State},
-    http::{header, Request, StatusCode, Uri},
+    http::{header, HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode, Uri},
     response::{IntoResponse, Response},
     routing::{any, get},
     Json, Router,
@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::parser::{ApiEndpoint, CategoryInfo, EndpointType, FieldType, MockValue, RqcConfig, SchemaBlock};
 
@@ -24,6 +24,8 @@ struct Assets;
 pub struct AppState {
     pub config: Arc<RqcConfig>,
     pub mock_mode: bool,
+    pub cors_mode: bool,
+    pub http_client: reqwest::Client,
 }
 
 #[derive(Serialize)]
@@ -34,6 +36,7 @@ pub struct ApiInfo {
     pub base_urls: Vec<String>,
     pub endpoint_count: usize,
     pub mock_mode: bool,
+    pub cors_mode: bool,
 }
 
 pub async fn start_server(
@@ -41,10 +44,17 @@ pub async fn start_server(
     port: u16,
     config: RqcConfig,
     mock_mode: bool,
+    cors_mode: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+
     let state = AppState {
         config: Arc::new(config),
         mock_mode,
+        cors_mode,
+        http_client,
     };
 
     let cors = CorsLayer::new()
@@ -61,6 +71,11 @@ pub async fn start_server(
     // Add mock proxy endpoint in mock mode
     if mock_mode {
         app = app.route("/mock/*path", any(mock_handler));
+    }
+
+    // Add CORS proxy endpoint in cors mode
+    if cors_mode {
+        app = app.route("/proxy/*path", any(cors_proxy_handler));
     }
 
     let app = app.fallback(static_handler).layer(cors).with_state(state);
@@ -109,6 +124,7 @@ async fn api_info(State(state): State<AppState>) -> Json<ApiInfo> {
         base_urls: state.config.get_base_urls(),
         endpoint_count: endpoints.len(),
         mock_mode: state.mock_mode,
+        cors_mode: state.cors_mode,
     })
 }
 
@@ -188,4 +204,150 @@ fn generate_mock_response(schema: &SchemaBlock) -> Value {
     }
 
     Value::Object(obj)
+}
+
+async fn cors_proxy_handler(
+    State(state): State<AppState>,
+    Path(path): Path<String>,
+    headers: HeaderMap,
+    method: Method,
+    body: Body,
+) -> Response {
+    // The path format should be: /proxy/{encoded_url}
+    // where encoded_url is the full URL to proxy to
+    let target_url = match urlencoding::decode(&path) {
+        Ok(url) => url.to_string(),
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "Invalid URL encoding",
+                    "path": path
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    // Build the request
+    let client = &state.http_client;
+    let mut request_builder = match method {
+        Method::GET => client.get(&target_url),
+        Method::POST => client.post(&target_url),
+        Method::PUT => client.put(&target_url),
+        Method::DELETE => client.delete(&target_url),
+        Method::PATCH => client.patch(&target_url),
+        Method::HEAD => client.head(&target_url),
+        Method::OPTIONS => client.request(reqwest::Method::OPTIONS, &target_url),
+        _ => {
+            return (
+                StatusCode::METHOD_NOT_ALLOWED,
+                Json(json!({
+                    "error": "Method not allowed",
+                    "method": method.as_str()
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    // Forward headers (except host and some hop-by-hop headers)
+    let skip_headers = [
+        "host",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailers",
+        "transfer-encoding",
+        "upgrade",
+    ];
+
+    for (key, value) in headers.iter() {
+        let key_str = key.as_str().to_lowercase();
+        if !skip_headers.contains(&key_str.as_str()) {
+            if let Ok(header_name) = reqwest::header::HeaderName::from_bytes(key.as_str().as_bytes())
+            {
+                if let Ok(header_value) = reqwest::header::HeaderValue::from_bytes(value.as_bytes())
+                {
+                    request_builder = request_builder.header(header_name, header_value);
+                }
+            }
+        }
+    }
+
+    // Forward body for methods that support it
+    if matches!(
+        method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    ) {
+        let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                warn!("Failed to read request body: {}", e);
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({
+                        "error": "Failed to read request body",
+                        "details": e.to_string()
+                    })),
+                )
+                    .into_response();
+            }
+        };
+        request_builder = request_builder.body(body_bytes);
+    }
+
+    // Execute the request
+    match request_builder.send().await {
+        Ok(response) => {
+            let status = StatusCode::from_u16(response.status().as_u16())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+
+            // Build response headers
+            let mut response_headers = HeaderMap::new();
+            for (key, value) in response.headers().iter() {
+                let key_str = key.as_str().to_lowercase();
+                // Skip CORS and hop-by-hop headers as we manage CORS ourselves
+                if !skip_headers.contains(&key_str.as_str())
+                    && !key_str.starts_with("access-control-")
+                {
+                    if let Ok(header_name) = HeaderName::from_bytes(key.as_str().as_bytes()) {
+                        if let Ok(header_value) = HeaderValue::from_bytes(value.as_bytes()) {
+                            response_headers.insert(header_name, header_value);
+                        }
+                    }
+                }
+            }
+
+            // Get the response body
+            match response.bytes().await {
+                Ok(bytes) => (status, response_headers, bytes.to_vec()).into_response(),
+                Err(e) => {
+                    warn!("Failed to read response body: {}", e);
+                    (
+                        StatusCode::BAD_GATEWAY,
+                        Json(json!({
+                            "error": "Failed to read response body",
+                            "details": e.to_string()
+                        })),
+                    )
+                        .into_response()
+                }
+            }
+        }
+        Err(e) => {
+            warn!("Proxy request failed: {}", e);
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": "Proxy request failed",
+                    "target_url": target_url,
+                    "details": e.to_string()
+                })),
+            )
+                .into_response()
+        }
+    }
 }

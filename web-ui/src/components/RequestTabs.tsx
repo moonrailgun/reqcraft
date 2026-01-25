@@ -8,6 +8,8 @@ import {
   ActionIcon,
   Badge,
   Tooltip,
+  Group,
+  Text,
 } from '@mantine/core';
 import {
   IconX,

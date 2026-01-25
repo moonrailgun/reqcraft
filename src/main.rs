@@ -29,8 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Init => {
             init_project()?;
         }
-        Commands::Dev { port, host, mock } => {
-            dev_server(&host, port, mock).await?;
+        Commands::Dev { port, host, mock, cors } => {
+            dev_server(&host, port, mock, cors).await?;
         }
     }
 
@@ -95,7 +95,8 @@ api /api/posts {
 async fn dev_server(
     host: &str,
     port: u16,
-    mock_mode: bool,
+    cli_mock: bool,
+    cli_cors: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let rqc_path = Path::new(RQC_FILE);
 
@@ -111,11 +112,21 @@ async fn dev_server(
     let endpoints = config.to_endpoints();
     info!("Loaded {} API endpoints from {}", endpoints.len(), RQC_FILE);
 
+    // Merge CLI flags with config file settings (CLI takes precedence)
+    let config_mock = config.config.as_ref().map(|c| c.mock).unwrap_or(false);
+    let config_cors = config.config.as_ref().map(|c| c.cors).unwrap_or(false);
+    
+    let mock_mode = cli_mock || config_mock;
+    let cors_mode = cli_cors || config_cors;
+
     if mock_mode {
         info!("Mock mode enabled");
     }
+    if cors_mode {
+        info!("CORS proxy mode enabled");
+    }
 
-    web::start_server(host, port, config, mock_mode).await?;
+    web::start_server(host, port, config, mock_mode, cors_mode).await?;
 
     Ok(())
 }

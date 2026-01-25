@@ -98,6 +98,16 @@ impl Parser {
                         .collect();
                     self.next_token();
                 }
+                "cors" => {
+                    self.next_token();
+                    config.cors = self.current_token.literal == "true";
+                    self.next_token();
+                }
+                "mock" => {
+                    self.next_token();
+                    config.mock = self.current_token.literal == "true";
+                    self.next_token();
+                }
                 _ => {
                     self.next_token();
                 }
@@ -182,7 +192,7 @@ impl Parser {
                     }
                 }
                 "event" => {
-                    let mut event = self.parse_ws_event()?;
+                    let event = self.parse_ws_event()?;
                     // Assign pending doc comment to event description if we add description to event
                     // For now, events don't have description in AST, so we just clear it or handle it if needed
                     pending_doc_comment = None;
@@ -438,6 +448,7 @@ impl Parser {
             desc: None,
             prefix: None,
             apis: Vec::new(),
+            ws_apis: Vec::new(),
             children: Vec::new(),
         };
 

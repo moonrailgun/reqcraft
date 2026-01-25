@@ -9,11 +9,13 @@ import {
   IconSettings,
   IconBookmark,
   IconCommand,
+  IconArrowsExchange,
 } from '@tabler/icons-react';
 
 interface WelcomePageProps {
   endpointCount: number;
   mockMode: boolean;
+  corsMode: boolean;
 }
 
 const features = [
@@ -47,9 +49,10 @@ const quickActions = [
   { icon: IconTerminal2, label: 'rqc init', desc: 'Initialize project' },
   { icon: IconSettings, label: 'rqc dev', desc: 'Start dev server' },
   { icon: IconBrandGithub, label: 'rqc dev --mock', desc: 'Enable mock mode' },
+  { icon: IconArrowsExchange, label: 'rqc dev --cors', desc: 'Enable CORS proxy' },
 ];
 
-export function WelcomePage({ endpointCount, mockMode }: WelcomePageProps) {
+export function WelcomePage({ endpointCount, mockMode, corsMode }: WelcomePageProps) {
   return (
     <Box className="flex-1 flex flex-col items-center justify-center p-8 bg-bg-primary overflow-auto">
       <Stack align="center" gap="xl" maw={800} w="100%">
@@ -100,6 +103,16 @@ export function WelcomePage({ endpointCount, mockMode }: WelcomePageProps) {
               leftSection={<IconBolt size={14} />}
             >
               Mock Mode Active
+            </Badge>
+          )}
+          {corsMode && (
+            <Badge
+              size="lg"
+              variant="light"
+              color="cyan"
+              leftSection={<IconArrowsExchange size={14} />}
+            >
+              CORS Proxy Active
             </Badge>
           )}
         </Group>

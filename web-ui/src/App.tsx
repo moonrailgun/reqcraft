@@ -84,6 +84,7 @@ export interface ApiInfo {
   baseUrls: string[];
   endpointCount: number;
   mockMode: boolean;
+  corsMode: boolean;
 }
 
 function App() {
@@ -92,6 +93,7 @@ function App() {
   const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryInfo | null>(null);
   const [mockMode, setMockMode] = useState(false);
+  const [corsMode, setCorsMode] = useState(false);
   const [baseUrls, setBaseUrls] = useState<string[]>([]);
   const [selectedBaseUrl, setSelectedBaseUrl] = useState<string>('');
 
@@ -133,11 +135,12 @@ function App() {
   }, [selectedEndpoint, categories, expandedCategoryIds, findCategoryPath]);
 
   useEffect(() => {
-    // Fetch API info to check mock mode and base URLs
+    // Fetch API info to check mock mode, cors mode and base URLs
     fetch('/api/info')
       .then((res) => res.json())
       .then((data: ApiInfo) => {
         setMockMode(data.mockMode);
+        setCorsMode(data.corsMode);
         setBaseUrls(data.baseUrls);
         if (data.baseUrls.length > 0) {
           setSelectedBaseUrl(data.baseUrls[0]);
@@ -399,7 +402,14 @@ function App() {
             url.searchParams.append(p.key, p.value);
           }
         });
-        targetUrl = url.toString();
+        
+        // If CORS mode is enabled, proxy through local server
+        if (corsMode) {
+          const encodedUrl = encodeURIComponent(url.toString());
+          targetUrl = `/proxy/${encodedUrl}`;
+        } else {
+          targetUrl = url.toString();
+        }
       }
 
       const headers: Record<string, string> = {};
@@ -555,7 +565,7 @@ function App() {
                 onSelectCategory={handleCategorySelect}
               />
             ) : (
-              <WelcomePage endpointCount={endpoints.length} mockMode={mockMode} />
+              <WelcomePage endpointCount={endpoints.length} mockMode={mockMode} corsMode={corsMode} />
             )}
           </div>
         </Panel>
