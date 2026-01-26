@@ -271,34 +271,6 @@ config {
 
 命令行参数和配置文件可以同时使用，只要任一方开启，对应功能就会生效。
 
-### CORS 代理模式
-
-当开发环境遇到 CORS 跨域问题时，可以开启 CORS 代理模式。开启后所有请求会通过本地服务器转发，从而绕过浏览器的 CORS 限制。
-
-可以通过命令行参数开启：
-```bash
-rqc dev --cors
-```
-
-也可以在配置文件中开启：
-```
-config {
-  cors true
-}
-```
-
-### Mock 模式配置
-
-除了通过命令行 `--mock` 参数开启 Mock 模式外，也可以在配置文件中开启：
-
-```
-config {
-  mock true
-}
-```
-
-命令行参数和配置文件设置可以同时使用，只要有一个为 true 即生效。
-
 ### Category 分类
 
 DSL 中可以对api scope使用 `category` 进行分类。包含name desc prefix 关键字来进一步描述category信息。这些字段都是可选的
