@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { Sidebar } from './components/Sidebar';
 import { RequestBuilder } from './components/RequestBuilder';
@@ -127,6 +127,7 @@ function App() {
   const [wsConnected, setWsConnected] = useState(false);
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [loading, setLoading] = useState(false);
+  const pendingWsEventRef = useRef<{ eventName: string; data: string } | null>(null);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [variables, setVariables] = useState<Variable[]>(() => loadVariables());
   const [configHeaders, setConfigHeaders] = useState<ConfigHeader[]>(() => loadConfigHeaders());
@@ -195,12 +196,20 @@ function App() {
         const params = new URLSearchParams(window.location.search);
         const path = params.get('path');
         const method = params.get('method');
+        const type = params.get('type');
         const variablesParam = params.get('variables');
         
         if (variablesParam === '1') {
           setVariablesSelected(true);
-        } else if (path && method) {
-          const endpoint = data.find((e) => e.path === path && e.method === method);
+        } else if (path) {
+          let endpoint: ApiEndpoint | undefined;
+          if (type === 'ws') {
+            // WebSocket endpoint - match by path only
+            endpoint = data.find((e) => e.path === path && e.endpointType === 'websocket');
+          } else if (method) {
+            // HTTP endpoint - match by path and method
+            endpoint = data.find((e) => e.path === path && e.method === method);
+          }
           if (endpoint) {
             setSelectedEndpoint(endpoint);
           }
@@ -294,8 +303,11 @@ function App() {
       }
       paramsFields.push({ key: '', value: '', enabled: true });
 
+      // Determine method based on endpoint type
+      const isWebSocket = selectedEndpoint.endpointType === 'websocket';
+      const method: HttpMethod = isWebSocket ? 'WS' : (selectedEndpoint.method as HttpMethod) || 'GET';
+
       // Generate body example for POST/PUT/PATCH methods
-      const method = selectedEndpoint.method?.toUpperCase() || 'GET';
       let body = '';
       if (['POST', 'PUT', 'PATCH'].includes(method) && hasBodyFields(selectedEndpoint.request)) {
         const exampleData = generateExampleFromSchema(selectedEndpoint.request!);
@@ -303,8 +315,8 @@ function App() {
       }
 
       setRequest({
-        method: selectedEndpoint.method as HttpMethod,
-        url: getFullUrl(selectedEndpoint.path),
+        method,
+        url: isWebSocket ? selectedEndpoint.path : getFullUrl(selectedEndpoint.path),
         params: paramsFields,
         headers: [{ key: '', value: '', enabled: true }],
         body,
@@ -362,10 +374,12 @@ function App() {
         setWsConnected(false);
       }
 
-      // Update URL with path and method
+      // Update URL with path and method/type
       const urlParams = new URLSearchParams();
       urlParams.set('path', endpoint.path);
-      if (endpoint.method) {
+      if (endpoint.endpointType === 'websocket') {
+        urlParams.set('type', 'ws');
+      } else if (endpoint.method) {
         urlParams.set('method', endpoint.method);
       }
       window.history.replaceState(null, '', `?${urlParams.toString()}`);
@@ -445,6 +459,14 @@ function App() {
           setLoading(false);
           setSocket(ws);
           setWsMessages(prev => [...prev, { type: 'received', data: 'Connected to ' + resolvedUrl, time: Date.now() }]);
+          
+          // Send pending event if exists
+          if (pendingWsEventRef.current) {
+            const { eventName, data } = pendingWsEventRef.current;
+            ws.send(data);
+            setWsMessages(prev => [...prev, { type: 'sent', data, time: Date.now(), event: eventName }]);
+            pendingWsEventRef.current = null;
+          }
         };
         ws.onmessage = (event) => {
           setWsMessages(prev => [...prev, { type: 'received', data: event.data, time: Date.now() }]);
@@ -562,8 +584,12 @@ function App() {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(data);
       setWsMessages(prev => [...prev, { type: 'sent', data, time: Date.now(), event: eventName }]);
+    } else if (!wsConnected && !loading) {
+      // Not connected, store event and trigger connection
+      pendingWsEventRef.current = { eventName, data };
+      handleSend(false);
     }
-  }, [socket]);
+  }, [socket, wsConnected, loading, handleSend]);
 
   return (
     <div className="h-screen bg-bg-primary">
@@ -604,6 +630,7 @@ function App() {
                   onSend={() => handleSend(false)}
                   onMockSend={mockMode && selectedEndpoint && selectedEndpoint.endpointType === 'http' ? () => handleSend(true) : undefined}
                   loading={loading || (request.method === 'WS' && !wsConnected && !!socket)}
+                  wsConnected={wsConnected}
                 />
 
                 <PanelGroup orientation="horizontal" className="flex-1">

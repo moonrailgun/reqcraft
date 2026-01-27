@@ -18,6 +18,7 @@ import {
   IconFolderOpen,
   IconApi,
   IconVariable,
+  IconPlugConnected,
 } from '@tabler/icons-react';
 import type { ApiEndpoint, CategoryInfo } from '../App';
 import type { Variable } from '../utils/variables';
@@ -341,6 +342,217 @@ function EndpointItem({
   );
 }
 
+interface WebSocketGroupProps {
+  endpoints: ApiEndpoint[];
+  selectedId?: string;
+  onSelect: (endpoint: ApiEndpoint) => void;
+}
+
+function WebSocketGroup({
+  endpoints,
+  selectedId,
+  onSelect,
+}: WebSocketGroupProps) {
+  const [opened, setOpened] = useState(true);
+
+  if (endpoints.length === 0) return null;
+
+  return (
+    <Box>
+      <UnstyledButton
+        onClick={() => setOpened((o) => !o)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          padding: '8px 12px',
+          borderRadius: 6,
+          transition: 'all 0.15s ease',
+        }}
+        className="hover:bg-[rgba(255,255,255,0.05)]"
+      >
+        <Box
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 20,
+            height: 20,
+            borderRadius: 4,
+          }}
+        >
+          <IconChevronRight
+            size={14}
+            style={{
+              transform: opened ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+              color: 'rgba(255, 255, 255, 0.5)',
+            }}
+          />
+        </Box>
+        <IconPlugConnected size={18} style={{ color: '#a78bfa', flexShrink: 0 }} />
+        <Text
+          size="sm"
+          fw={500}
+          style={{ flex: 1, color: 'rgba(255, 255, 255, 0.7)' }}
+        >
+          WebSocket
+        </Text>
+        <Badge
+          size="xs"
+          variant="light"
+          style={{
+            backgroundColor: 'rgba(139, 92, 246, 0.15)',
+            color: '#a78bfa',
+            border: 'none',
+          }}
+        >
+          {endpoints.length}
+        </Badge>
+      </UnstyledButton>
+
+      <Collapse in={opened}>
+        <Stack gap={2} style={{ marginTop: 2 }}>
+          {endpoints.map((ep) => (
+            <WebSocketItem
+              key={ep.id}
+              endpoint={ep}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              level={1}
+            />
+          ))}
+        </Stack>
+      </Collapse>
+    </Box>
+  );
+}
+
+interface WebSocketItemProps {
+  endpoint: ApiEndpoint;
+  selectedId?: string;
+  onSelect: (endpoint: ApiEndpoint) => void;
+  level?: number;
+}
+
+function WebSocketItem({
+  endpoint,
+  selectedId,
+  onSelect,
+  level = 0,
+}: WebSocketItemProps) {
+  const isSelected = selectedId === endpoint.id;
+  const methodStyle = methodStyles['WS'];
+
+  // Extract display name from URL
+  const getDisplayUrl = (url: string) => {
+    try {
+      const parsed = new URL(url);
+      return parsed.host + parsed.pathname;
+    } catch {
+      return url;
+    }
+  };
+
+  return (
+    <TreeItem level={level}>
+      <Tooltip
+        label={endpoint.description}
+        disabled={!endpoint.description}
+        position="right"
+        withArrow
+        multiline
+        w={280}
+      >
+        <UnstyledButton
+          onClick={() => onSelect(endpoint)}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            width: '100%',
+            padding: '6px 12px',
+            borderRadius: 6,
+            backgroundColor: isSelected
+              ? 'rgba(139, 92, 246, 0.15)'
+              : 'transparent',
+            transition: 'all 0.15s ease',
+          }}
+          className="hover:bg-[rgba(255,255,255,0.05)]"
+        >
+          <Group gap={8} wrap="nowrap" style={{ width: '100%' }}>
+            <IconPlugConnected
+              size={14}
+              style={{
+                color: isSelected ? '#a78bfa' : 'rgba(255, 255, 255, 0.4)',
+                flexShrink: 0,
+              }}
+            />
+            <Box
+              style={{
+                padding: '2px 6px',
+                borderRadius: 4,
+                backgroundColor: methodStyle.bg,
+                flexShrink: 0,
+              }}
+            >
+              <Text
+                size="xs"
+                fw={600}
+                style={{
+                  color: methodStyle.text,
+                  fontFamily: 'var(--mantine-font-family-monospace)',
+                  fontSize: 10,
+                }}
+              >
+                WS
+              </Text>
+            </Box>
+            <Text
+              size="xs"
+              style={{
+                color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.7)',
+                fontFamily: 'var(--mantine-font-family-monospace)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {getDisplayUrl(endpoint.path)}
+            </Text>
+          </Group>
+          {endpoint.name && (
+            <Text
+              size="xs"
+              style={{
+                color: isSelected ? 'rgba(255,255,255,0.8)' : 'rgba(255, 255, 255, 0.45)',
+                marginLeft: 22,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {endpoint.name}
+            </Text>
+          )}
+          {endpoint.events && endpoint.events.length > 0 && (
+            <Text
+              size="xs"
+              style={{
+                color: 'rgba(139, 92, 246, 0.6)',
+                marginLeft: 22,
+              }}
+            >
+              {endpoint.events.length} event{endpoint.events.length > 1 ? 's' : ''}
+            </Text>
+          )}
+        </UnstyledButton>
+      </Tooltip>
+    </TreeItem>
+  );
+}
+
 interface UncategorizedGroupProps {
   endpoints: ApiEndpoint[];
   selectedId?: string;
@@ -354,9 +566,15 @@ function UncategorizedGroup({
 }: UncategorizedGroupProps) {
   const [opened, setOpened] = useState(true);
 
+  // Filter out WebSocket endpoints - they are shown in WebSocketGroup
+  const httpEndpoints = useMemo(
+    () => endpoints.filter((ep) => ep.endpointType !== 'websocket'),
+    [endpoints]
+  );
+
   const grouped = useMemo(() => {
     const groups: Record<string, ApiEndpoint[]> = {};
-    endpoints.forEach((ep) => {
+    httpEndpoints.forEach((ep) => {
       const parts = ep.path.split('/').filter(Boolean);
       const group = parts.length > 1 ? `/${parts[0]}` : '/';
       if (!groups[group]) {
@@ -365,9 +583,9 @@ function UncategorizedGroup({
       groups[group].push(ep);
     });
     return groups;
-  }, [endpoints]);
+  }, [httpEndpoints]);
 
-  if (endpoints.length === 0) return null;
+  if (httpEndpoints.length === 0) return null;
 
   return (
     <>
@@ -465,6 +683,11 @@ export function Sidebar({
   const uncategorizedEndpoints = useMemo(
     () => endpoints.filter((ep) => !ep.categoryId),
     [endpoints]
+  );
+
+  const uncategorizedWsEndpoints = useMemo(
+    () => uncategorizedEndpoints.filter((ep) => ep.endpointType === 'websocket'),
+    [uncategorizedEndpoints]
   );
 
   const activeVariableCount = variables.filter((v) => v.name && v.enabled).length;
@@ -672,6 +895,12 @@ export function Sidebar({
 
             <UncategorizedGroup
               endpoints={uncategorizedEndpoints}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+
+            <WebSocketGroup
+              endpoints={uncategorizedWsEndpoints}
               selectedId={selectedId}
               onSelect={onSelect}
             />

@@ -58,7 +58,14 @@ export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected
     return (
       <Box className="flex flex-col h-full">
         <Box className="flex items-center justify-between border-b border-border bg-bg-secondary px-4 h-[41px]">
-          <Text size="sm" fw={600}>WebSocket Messages</Text>
+          <Group gap="md">
+            <Text size="sm" fw={600}>WebSocket Messages</Text>
+            {wsMessages && wsMessages.length > 0 && (
+              <Badge size="xs" variant="light" color="gray">
+                {wsMessages.length}
+              </Badge>
+            )}
+          </Group>
           <Group gap="xs">
             <Box
               style={{
@@ -74,58 +81,71 @@ export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected
             </Text>
           </Group>
         </Box>
-        <Box className="flex-1 overflow-auto bg-bg-primary p-0">
-          <Table verticalSpacing="xs">
-            <Table.Thead>
-              <Table.Tr className="border-b border-border bg-bg-secondary sticky top-0 z-10">
-                <Table.Th w={40} />
-                <Table.Th>Data</Table.Th>
-                <Table.Th w={100}>Time</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {wsMessages?.map((msg, i) => (
-                <Table.Tr key={i} className="border-b border-border hover:bg-bg-hover">
-                  <Table.Td>
+        <Box className="flex-1 overflow-auto bg-bg-primary p-2">
+          <Stack gap="xs">
+            {[...(wsMessages || [])].reverse().map((msg, i) => (
+              <Box
+                key={i}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  backgroundColor: msg.type === 'sent'
+                    ? 'rgba(59, 130, 246, 0.08)'
+                    : 'rgba(34, 197, 94, 0.08)',
+                  borderLeft: `3px solid ${msg.type === 'sent' ? '#3b82f6' : '#22c55e'}`,
+                }}
+              >
+                <Group justify="space-between" align="flex-start" mb={6}>
+                  <Group gap="xs">
                     {msg.type === 'sent' ? (
-                      <ThemeIcon size="sm" color="blue" variant="light">
-                        <IconArrowUpRight size={12} />
+                      <ThemeIcon size="xs" color="blue" variant="light" radius="xl">
+                        <IconArrowUpRight size={10} />
                       </ThemeIcon>
                     ) : (
-                      <ThemeIcon size="sm" color="green" variant="light">
-                        <IconArrowDownLeft size={12} />
+                      <ThemeIcon size="xs" color="green" variant="light" radius="xl">
+                        <IconArrowDownLeft size={10} />
                       </ThemeIcon>
                     )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Stack gap={2}>
-                      {msg.event && (
-                        <Text size="xs" c="dimmed" ff="monospace">Event: {msg.event}</Text>
-                      )}
-                      <Code block className="bg-transparent p-0 text-xs">
-                        {formatJson(msg.data)}
-                      </Code>
-                    </Stack>
-                  </Table.Td>
-                  <Table.Td>
-                    <Text size="xs" c="dimmed" ff="monospace">
-                      {new Date(msg.time).toLocaleTimeString()}
-                    </Text>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-              {(!wsMessages || wsMessages.length === 0) && (
-                <Table.Tr>
-                  <Table.Td colSpan={3} className="text-center py-12">
-                    <Stack align="center" gap="xs">
-                      <IconMessage size={32} color="var(--color-text-dimmed)" />
-                      <Text size="sm" c="dimmed">No messages yet</Text>
-                    </Stack>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
+                    <Badge
+                      size="xs"
+                      variant="light"
+                      color={msg.type === 'sent' ? 'blue' : 'green'}
+                    >
+                      {msg.type === 'sent' ? 'Sent' : 'Received'}
+                    </Badge>
+                    {msg.event && (
+                      <Badge size="xs" variant="outline" color="violet">
+                        {msg.event}
+                      </Badge>
+                    )}
+                  </Group>
+                  <Text size="xs" c="dimmed" ff="monospace">
+                    {new Date(msg.time).toLocaleTimeString()}
+                  </Text>
+                </Group>
+                <Code
+                  block
+                  style={{
+                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                    fontSize: 12,
+                    padding: 8,
+                    borderRadius: 4,
+                  }}
+                >
+                  {formatJson(msg.data)}
+                </Code>
+              </Box>
+            ))}
+            {(!wsMessages || wsMessages.length === 0) && (
+              <Box className="text-center py-12">
+                <Stack align="center" gap="xs">
+                  <IconMessage size={32} color="var(--color-text-dimmed)" />
+                  <Text size="sm" c="dimmed">No messages yet</Text>
+                  <Text size="xs" c="dimmed">Connect to start receiving messages</Text>
+                </Stack>
+              </Box>
+            )}
+          </Stack>
         </Box>
       </Box>
     );

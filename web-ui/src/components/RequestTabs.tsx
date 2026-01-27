@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   Box,
   Tabs,
@@ -48,8 +48,37 @@ export function RequestTabs({
   wsEvents,
   onSendEvent,
 }: RequestTabsProps) {
-  const showBodyTab = METHODS_WITH_BODY.includes(method.toUpperCase());
-  const isWs = method.toUpperCase() === 'WS';
+  const methodUpper = method?.toUpperCase() || '';
+  const showBodyTab = METHODS_WITH_BODY.includes(methodUpper);
+  const isWs = methodUpper === 'WS';
+
+  // Get available tabs based on current state
+  const availableTabs = useMemo(() => {
+    const tabs: string[] = [];
+    if (!isWs) {
+      tabs.push('params', 'headers');
+      if (showBodyTab) tabs.push('body');
+    } else {
+      tabs.push('events');
+    }
+    return tabs;
+  }, [isWs, showBodyTab]);
+
+  const [activeTab, setActiveTab] = useState<string | null>(() => 
+    isWs ? 'events' : 'params'
+  );
+
+  // Switch to valid tab when available tabs change
+  useEffect(() => {
+    if (activeTab && !availableTabs.includes(activeTab)) {
+      setActiveTab(availableTabs[0] || null);
+    }
+  }, [availableTabs, activeTab]);
+
+  // Reset to default tab when switching endpoint type
+  useEffect(() => {
+    setActiveTab(isWs ? 'events' : 'params');
+  }, [isWs]);
 
   const hasExample = useMemo(() => {
     return hasBodyFields(requestSchema);
@@ -184,7 +213,8 @@ export function RequestTabs({
 
   return (
     <Tabs
-      defaultValue="params"
+      value={activeTab}
+      onChange={setActiveTab}
       className="flex-1 flex flex-col min-h-0"
       styles={{
         root: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 },
@@ -192,22 +222,26 @@ export function RequestTabs({
       }}
     >
       <Tabs.List className="bg-bg-secondary border-b border-border">
-        <Tabs.Tab value="params">
-          Params
-          {getActiveCount(params) > 0 && (
-            <Badge size="xs" color="orange" ml={6}>
-              {getActiveCount(params)}
-            </Badge>
-          )}
-        </Tabs.Tab>
-        <Tabs.Tab value="headers">
-          Headers
-          {getActiveCount(headers) > 0 && (
-            <Badge size="xs" color="orange" ml={6}>
-              {getActiveCount(headers)}
-            </Badge>
-          )}
-        </Tabs.Tab>
+        {!isWs && (
+          <>
+            <Tabs.Tab value="params">
+              Params
+              {getActiveCount(params) > 0 && (
+                <Badge size="xs" color="orange" ml={6}>
+                  {getActiveCount(params)}
+                </Badge>
+              )}
+            </Tabs.Tab>
+            <Tabs.Tab value="headers">
+              Headers
+              {getActiveCount(headers) > 0 && (
+                <Badge size="xs" color="orange" ml={6}>
+                  {getActiveCount(headers)}
+                </Badge>
+              )}
+            </Tabs.Tab>
+          </>
+        )}
         {showBodyTab && <Tabs.Tab value="body">Body</Tabs.Tab>}
         {isWs && (
           <Tabs.Tab value="events">
@@ -221,13 +255,17 @@ export function RequestTabs({
         )}
       </Tabs.List>
 
-      <Tabs.Panel value="params" className="overflow-auto bg-bg-primary">
-        {renderKeyValueTable(params, onParamsChange)}
-      </Tabs.Panel>
+      {!isWs && (
+        <>
+          <Tabs.Panel value="params" className="overflow-auto bg-bg-primary">
+            {renderKeyValueTable(params, onParamsChange)}
+          </Tabs.Panel>
 
-      <Tabs.Panel value="headers" className="overflow-auto bg-bg-primary">
-        {renderKeyValueTable(headers, onHeadersChange)}
-      </Tabs.Panel>
+          <Tabs.Panel value="headers" className="overflow-auto bg-bg-primary">
+            {renderKeyValueTable(headers, onHeadersChange)}
+          </Tabs.Panel>
+        </>
+      )}
 
       {showBodyTab && (
         <Tabs.Panel value="body" className="overflow-hidden bg-bg-primary">

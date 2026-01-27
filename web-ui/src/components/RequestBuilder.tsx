@@ -1,5 +1,5 @@
 import { Box, TextInput, Button, Group, Tooltip, Badge } from '@mantine/core';
-import { IconSend, IconLoader2, IconMask } from '@tabler/icons-react';
+import { IconSend, IconLoader2, IconMask, IconPlugConnected, IconPlugConnectedX } from '@tabler/icons-react';
 import type { HttpMethod } from '../App';
 
 interface RequestBuilderProps {
@@ -9,6 +9,7 @@ interface RequestBuilderProps {
   onSend: () => void;
   onMockSend?: () => void;
   loading: boolean;
+  wsConnected?: boolean;
 }
 
 const methodColors: Record<HttpMethod, string> = {
@@ -27,6 +28,7 @@ export function RequestBuilder({
   onSend,
   onMockSend,
   loading,
+  wsConnected,
 }: RequestBuilderProps) {
   const isWs = method === 'WS';
 
@@ -74,16 +76,22 @@ export function RequestBuilder({
         <Button
           onClick={onSend}
           disabled={loading || !url}
-          color={isWs ? "violet" : "orange"}
+          color={isWs ? (wsConnected ? "red" : "violet") : "orange"}
           leftSection={
             loading ? (
               <IconLoader2 size={16} className="animate-spin" />
+            ) : isWs ? (
+              wsConnected ? <IconPlugConnectedX size={16} /> : <IconPlugConnected size={16} />
             ) : (
               <IconSend size={16} />
             )
           }
         >
-          {loading ? (isWs ? 'Connecting...' : 'Sending...') : (isWs ? 'Connect' : 'Send')}
+          {loading 
+            ? (isWs ? 'Connecting...' : 'Sending...') 
+            : isWs 
+              ? (wsConnected ? 'Disconnect' : 'Connect') 
+              : 'Send'}
         </Button>
 
         {onMockSend && (
