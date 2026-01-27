@@ -107,5 +107,35 @@
     "prefix": "@default",
     "body": ["@default(\"${1:value}\")"],
     "description": "Default value for header"
+  },
+  "WebSocket": {
+    "prefix": "ws",
+    "body": [
+      "ws ${1:wss://example.com/} {",
+      "\tevent ${2:eventName} {",
+      "\t\trequest {",
+      "\t\t\t$3",
+      "\t\t}",
+      "\t\tresponse {",
+      "\t\t\t$0",
+      "\t\t}",
+      "\t}",
+      "}"
+    ],
+    "description": "WebSocket endpoint"
+  },
+  "Event": {
+    "prefix": "event",
+    "body": [
+      "event ${1:eventName} {",
+      "\trequest {",
+      "\t\t$2",
+      "\t}",
+      "\tresponse {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "WebSocket event"
   }
 }

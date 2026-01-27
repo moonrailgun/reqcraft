@@ -8,6 +8,7 @@
     { "include": "#config" },
     { "include": "#category" },
     { "include": "#api" },
+    { "include": "#websocket" },
     { "include": "#annotations" },
     { "include": "#types" },
     { "include": "#strings" },
@@ -111,6 +112,31 @@
       },
       "patterns": [
         { "include": "#http-methods" },
+        { "include": "#comments" }
+      ]
+    },
+    "websocket": {
+      "begin": "\\b(ws)\\s+(\\S+)\\s*\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.rqc" },
+        "2": { "name": "string.unquoted.url.rqc" }
+      },
+      "patterns": [
+        { "include": "#ws-event" },
+        { "include": "#comments" }
+      ]
+    },
+    "ws-event": {
+      "begin": "\\b(event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.event.rqc" },
+        "2": { "name": "entity.name.function.rqc" }
+      },
+      "patterns": [
+        { "include": "#properties" },
+        { "include": "#request-response" },
         { "include": "#comments" }
       ]
     },
