@@ -879,19 +879,29 @@ export function Sidebar({
           </Group>
 
           <Stack gap={2}>
-            {categories.map((category) => (
-              <CategoryGroup
-                key={category.id}
-                category={category}
-                endpoints={endpoints}
-                allEndpoints={endpoints}
-                selectedId={selectedId}
-                selectedCategoryId={selectedCategoryId}
-                expandedCategoryIds={expandedCategoryIds}
-                onSelect={onSelect}
-                onCategorySelect={onCategorySelect}
-              />
-            ))}
+            {/* WebSocket endpoints first */}
+            <WebSocketGroup
+              endpoints={uncategorizedWsEndpoints}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+
+            {/* Non-OpenAPI categories */}
+            {categories
+              .filter((category) => !category.id.startsWith('openapi'))
+              .map((category) => (
+                <CategoryGroup
+                  key={category.id}
+                  category={category}
+                  endpoints={endpoints}
+                  allEndpoints={endpoints}
+                  selectedId={selectedId}
+                  selectedCategoryId={selectedCategoryId}
+                  expandedCategoryIds={expandedCategoryIds}
+                  onSelect={onSelect}
+                  onCategorySelect={onCategorySelect}
+                />
+              ))}
 
             <UncategorizedGroup
               endpoints={uncategorizedEndpoints}
@@ -899,11 +909,22 @@ export function Sidebar({
               onSelect={onSelect}
             />
 
-            <WebSocketGroup
-              endpoints={uncategorizedWsEndpoints}
-              selectedId={selectedId}
-              onSelect={onSelect}
-            />
+            {/* OpenAPI categories last */}
+            {categories
+              .filter((category) => category.id.startsWith('openapi'))
+              .map((category) => (
+                <CategoryGroup
+                  key={category.id}
+                  category={category}
+                  endpoints={endpoints}
+                  allEndpoints={endpoints}
+                  selectedId={selectedId}
+                  selectedCategoryId={selectedCategoryId}
+                  expandedCategoryIds={expandedCategoryIds}
+                  onSelect={onSelect}
+                  onCategorySelect={onCategorySelect}
+                />
+              ))}
 
             {endpoints.length === 0 && (
               <Box

@@ -10,12 +10,15 @@ import {
   Tooltip,
   Group,
   Text,
+  Button,
 } from '@mantine/core';
 import {
   IconX,
   IconFileImport,
   IconSend,
   IconMessage,
+  IconArrowLeft,
+  IconChevronRight,
 } from '@tabler/icons-react';
 import Editor from '@monaco-editor/react';
 import type { KeyValue, SchemaBlock, WsEvent } from '../App';
@@ -52,6 +55,10 @@ export function RequestTabs({
   const showBodyTab = METHODS_WITH_BODY.includes(methodUpper);
   const isWs = methodUpper === 'WS';
 
+  // WebSocket event editing state
+  const [selectedWsEvent, setSelectedWsEvent] = useState<WsEvent | null>(null);
+  const [wsEventData, setWsEventData] = useState<string>('');
+
   // Get available tabs based on current state
   const availableTabs = useMemo(() => {
     const tabs: string[] = [];
@@ -64,7 +71,7 @@ export function RequestTabs({
     return tabs;
   }, [isWs, showBodyTab]);
 
-  const [activeTab, setActiveTab] = useState<string | null>(() => 
+  const [activeTab, setActiveTab] = useState<string | null>(() =>
     isWs ? 'events' : 'params'
   );
 
@@ -78,7 +85,15 @@ export function RequestTabs({
   // Reset to default tab when switching endpoint type
   useEffect(() => {
     setActiveTab(isWs ? 'events' : 'params');
+    setSelectedWsEvent(null);
+    setWsEventData('');
   }, [isWs]);
+
+  // Reset selected event when wsEvents change (endpoint changed)
+  useEffect(() => {
+    setSelectedWsEvent(null);
+    setWsEventData('');
+  }, [wsEvents]);
 
   const hasExample = useMemo(() => {
     return hasBodyFields(requestSchema);
@@ -90,10 +105,20 @@ export function RequestTabs({
     onBodyChange(JSON.stringify(exampleData, null, 2));
   };
 
-  const handleSendWsEvent = (event: WsEvent) => {
-    if (!onSendEvent) return;
+  const handleSelectWsEvent = (event: WsEvent) => {
+    setSelectedWsEvent(event);
     const data = event.request ? JSON.stringify(generateExampleFromSchema(event.request), null, 2) : '{}';
-    onSendEvent(event.name, data);
+    setWsEventData(data);
+  };
+
+  const handleSendWsEvent = () => {
+    if (!onSendEvent || !selectedWsEvent) return;
+    onSendEvent(selectedWsEvent.name, wsEventData);
+  };
+
+  const handleBackToEventsList = () => {
+    setSelectedWsEvent(null);
+    setWsEventData('');
   };
   const updateKeyValue = (
     items: KeyValue[],
@@ -312,55 +337,111 @@ export function RequestTabs({
       )}
 
       {isWs && (
-        <Tabs.Panel value="events" className="overflow-auto bg-bg-primary">
-          <Table className="w-full">
-            <Table.Thead>
-              <Table.Tr className="border-b border-border">
-                <Table.Th className="text-text-secondary font-medium px-4">Event Name</Table.Th>
-                <Table.Th className="text-text-secondary font-medium">Schema</Table.Th>
-                <Table.Th w={80} />
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {wsEvents?.map((event) => (
-                <Table.Tr key={event.name} className="border-b border-border hover:bg-bg-hover">
-                  <Table.Td className="px-4">
-                    <Group gap="xs">
-                      <IconMessage size={14} color="var(--color-accent-violet)" />
-                      <Text size="sm" fw={500}>{event.name}</Text>
-                    </Group>
-                  </Table.Td>
-                  <Table.Td>
-                    {event.request && (
-                      <Badge size="xs" variant="outline" color="gray">Request</Badge>
-                    )}
-                    {event.response && (
-                      <Badge size="xs" variant="outline" color="blue" ml={4}>Response</Badge>
-                    )}
-                  </Table.Td>
-                  <Table.Td>
-                    <Tooltip label="Send Event">
+        <Tabs.Panel value="events" className="overflow-hidden bg-bg-primary">
+          {selectedWsEvent ? (
+            <Box className="flex flex-col h-full">
+              <Box className="flex items-center justify-between px-4 py-2 bg-bg-secondary border-b border-border">
+                <Group gap="sm">
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    onClick={handleBackToEventsList}
+                  >
+                    <IconArrowLeft size={16} />
+                  </ActionIcon>
+                  <IconMessage size={14} color="var(--color-accent-violet)" />
+                  <Text size="sm" fw={600}>{selectedWsEvent.name}</Text>
+                  {selectedWsEvent.request && (
+                    <Badge size="xs" variant="outline" color="gray">Request</Badge>
+                  )}
+                </Group>
+                <Button
+                  size="xs"
+                  color="violet"
+                  leftSection={<IconSend size={14} />}
+                  onClick={handleSendWsEvent}
+                >
+                  Send
+                </Button>
+              </Box>
+              <Box style={{ flex: 1, minHeight: 0 }}>
+                <Editor
+                  height="100%"
+                  defaultLanguage="json"
+                  value={wsEventData}
+                  onChange={(value) => setWsEventData(value || '')}
+                  theme="vs-dark"
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    tabSize: 2,
+                    wordWrap: 'on',
+                    formatOnPaste: true,
+                    formatOnType: true,
+                    padding: { top: 12 },
+                  }}
+                />
+              </Box>
+            </Box>
+          ) : (
+            <Table className="w-full">
+              <Table.Thead>
+                <Table.Tr className="border-b border-border">
+                  <Table.Th className="text-text-secondary font-medium px-4">Event Name</Table.Th>
+                  <Table.Th className="text-text-secondary font-medium">Schema</Table.Th>
+                  <Table.Th w={40} />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {wsEvents?.map((event) => (
+                  <Table.Tr
+                    key={event.name}
+                    className="border-b border-border hover:bg-bg-hover cursor-pointer"
+                    onClick={() => handleSelectWsEvent(event)}
+                  >
+                    <Table.Td className="px-4">
+                      <Group gap="xs">
+                        <IconMessage size={14} color="var(--color-accent-violet)" />
+                        <Text size="sm" fw={500}>{event.name}</Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td>
+                      {event.request && (
+                        <Badge size="xs" variant="outline" color="gray">Request</Badge>
+                      )}
+                      {event.response && (
+                        <Badge size="xs" variant="outline" color="blue" ml={4}>Response</Badge>
+                      )}
+                    </Table.Td>
+                    <Table.Td>
                       <ActionIcon
-                        variant="light"
-                        color="violet"
+                        variant="subtle"
+                        color="gray"
                         size="sm"
-                        onClick={() => handleSendWsEvent(event)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectWsEvent(event);
+                        }}
                       >
-                        <IconSend size={14} />
+                        <IconChevronRight size={14} />
                       </ActionIcon>
-                    </Tooltip>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-              {(!wsEvents || wsEvents.length === 0) && (
-                <Table.Tr>
-                  <Table.Td colSpan={3} className="text-center py-8">
-                    <Text size="sm" c="dimmed">No events defined</Text>
-                  </Table.Td>
-                </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+                {(!wsEvents || wsEvents.length === 0) && (
+                  <Table.Tr>
+                    <Table.Td colSpan={3} className="text-center py-8">
+                      <Text size="sm" c="dimmed">No events defined</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+          )}
         </Tabs.Panel>
       )}
     </Tabs>
