@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   Box,
   Tabs,
@@ -11,6 +12,7 @@ import {
   ThemeIcon,
 } from '@mantine/core';
 import { IconBolt, IconMessage, IconArrowUpRight, IconArrowDownLeft } from '@tabler/icons-react';
+import Editor from '@monaco-editor/react';
 import type { ResponseState } from '../App';
 
 interface ResponsePanelProps {
@@ -21,27 +23,60 @@ interface ResponsePanelProps {
   wsConnected?: boolean;
 }
 
-export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected }: ResponsePanelProps) {
-  const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return 'green';
-    if (status >= 300 && status < 400) return 'blue';
-    if (status >= 400 && status < 500) return 'yellow';
-    return 'red';
-  };
+const getStatusColor = (status: number) => {
+  if (status >= 200 && status < 300) return 'green';
+  if (status >= 300 && status < 400) return 'blue';
+  if (status >= 400 && status < 500) return 'yellow';
+  return 'red';
+};
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
+const formatSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
 
-  const formatJson = (text: string) => {
+const formatJson = (text: string) => {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+};
+
+const getLanguageFromContentType = (headers: Record<string, string>): string => {
+  const contentType = headers['content-type'] || headers['Content-Type'] || '';
+  const mimeType = contentType.split(';')[0].trim().toLowerCase();
+
+  if (mimeType.includes('json')) return 'json';
+  if (mimeType.includes('html')) return 'html';
+  if (mimeType.includes('xml')) return 'xml';
+  if (mimeType.includes('javascript')) return 'javascript';
+  if (mimeType.includes('css')) return 'css';
+  if (mimeType.includes('yaml') || mimeType.includes('yml')) return 'yaml';
+  return 'plaintext';
+};
+
+const formatBody = (body: string, language: string): string => {
+  if (language === 'json') {
     try {
-      return JSON.stringify(JSON.parse(text), null, 2);
+      return JSON.stringify(JSON.parse(body), null, 2);
     } catch {
-      return text;
+      return body;
     }
-  };
+  }
+  return body;
+};
+
+export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected }: ResponsePanelProps) {
+  const { language, formattedBody } = useMemo(() => {
+    if (!response) return { language: 'plaintext', formattedBody: '' };
+    const lang = getLanguageFromContentType(response.headers);
+    return {
+      language: lang,
+      formattedBody: formatBody(response.body, lang),
+    };
+  }, [response]);
 
   if (loading && !isWs) {
     return (
@@ -170,9 +205,9 @@ export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected
   }
 
   return (
-    <Box className="flex flex-col h-full">
-      <Tabs defaultValue="body" className="flex flex-col h-full">
-        <Box className="flex items-center justify-between border-b border-border bg-bg-secondary px-4">
+    <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <Tabs defaultValue="body" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        <Box className="flex items-center justify-between border-b border-border bg-bg-secondary px-4" style={{ flexShrink: 0 }}>
           <Tabs.List className="border-0">
             <Tabs.Tab value="body">Body</Tabs.Tab>
             <Tabs.Tab value="headers">Headers</Tabs.Tab>
@@ -206,34 +241,42 @@ export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected
           </Group>
         </Box>
 
-        <Tabs.Panel value="body" className="flex-1 overflow-auto bg-bg-primary p-4">
-          <Code
-            block
-            className="bg-transparent text-sm whitespace-pre-wrap break-all"
-            styles={{
-              root: {
-                backgroundColor: 'transparent',
-                padding: 0,
-              },
+        <Tabs.Panel value="body" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} className="bg-bg-primary">
+          <Editor
+            height="100%"
+            language={language}
+            value={formattedBody}
+            theme="vs-dark"
+            options={{
+              readOnly: true,
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              automaticLayout: true,
+              tabSize: 2,
+              wordWrap: 'on',
+              padding: { top: 12 },
+              domReadOnly: true,
             }}
-          >
-            {formatJson(response.body)}
-          </Code>
+          />
         </Tabs.Panel>
 
-        <Tabs.Panel value="headers" className="flex-1 overflow-auto bg-bg-primary p-4">
-          <Table>
-            <Table.Tbody>
-              {Object.entries(response.headers).map(([key, value]) => (
-                <Table.Tr key={key} className="border-b border-border">
-                  <Table.Td className="font-medium text-text-secondary py-2 pr-4">
-                    {key}
-                  </Table.Td>
-                  <Table.Td className="font-mono py-2">{value}</Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
+        <Tabs.Panel value="headers" style={{ flex: 1, minHeight: 0, overflow: 'auto' }} className="bg-bg-primary p-4">
+          <Table.ScrollContainer minWidth={400}>
+            <Table>
+              <Table.Tbody>
+                {Object.entries(response.headers).map(([key, value]) => (
+                  <Table.Tr key={key} className="border-b border-border">
+                    <Table.Td className="font-medium text-text-secondary py-2 pr-4 whitespace-nowrap">
+                      {key}
+                    </Table.Td>
+                    <Table.Td className="font-mono py-2 break-all">{value}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
         </Tabs.Panel>
       </Tabs>
     </Box>
