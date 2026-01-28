@@ -607,6 +607,7 @@ function App() {
             onCategorySelect={handleCategorySelect}
             onReset={handleReset}
             mockMode={mockMode}
+            corsMode={corsMode}
             baseUrls={baseUrls}
             selectedBaseUrl={selectedBaseUrl}
             onBaseUrlChange={handleBaseUrlChange}

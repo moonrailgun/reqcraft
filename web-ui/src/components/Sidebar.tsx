@@ -33,6 +33,7 @@ interface SidebarProps {
   onCategorySelect: (category: CategoryInfo) => void;
   onReset: () => void;
   mockMode?: boolean;
+  corsMode?: boolean;
   baseUrls: string[];
   selectedBaseUrl: string;
   onBaseUrlChange: (url: string) => void;
@@ -673,6 +674,7 @@ export function Sidebar({
   onCategorySelect,
   onReset,
   mockMode,
+  corsMode,
   baseUrls,
   selectedBaseUrl,
   onBaseUrlChange,
@@ -972,6 +974,7 @@ export function Sidebar({
               Connected
             </Text>
           </Group>
+          <Group gap={2}>
           {mockMode && (
             <Badge
               size="sm"
@@ -984,6 +987,20 @@ export function Sidebar({
               🎭 Mock
             </Badge>
           )}
+          {corsMode && (
+            <Badge
+              size="sm"
+              style={{
+                backgroundColor: 'rgba(34, 211, 238, 0.15)',
+                color: '#22d3ee',
+                border: 'none',
+              }}
+            >
+              🔀 CORS
+            </Badge>
+          )}
+
+          </Group>
         </Group>
       </Box>
     </Box>
