@@ -434,6 +434,22 @@ function App() {
     window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
+  const handleParamsChange = useCallback((params: KeyValue[]) => {
+    setRequest((prev) => ({ ...prev, params }));
+  }, []);
+
+  const handleHeadersChange = useCallback((headers: KeyValue[]) => {
+    setRequest((prev) => ({ ...prev, headers }));
+  }, []);
+
+  const handleBodyChange = useCallback((body: string) => {
+    setRequest((prev) => ({ ...prev, body }));
+  }, []);
+
+  const handleUrlChange = useCallback((url: string) => {
+    setRequest((prev) => ({ ...prev, url }));
+  }, []);
+
   const handleSend = async (useMock: boolean = false) => {
     if (!request.url && !useMock) return;
 
@@ -580,6 +596,17 @@ function App() {
     }
   };
 
+  const handleSendRef = useRef(handleSend);
+  handleSendRef.current = handleSend;
+
+  const handleSendRequest = useCallback(() => {
+    handleSendRef.current(false);
+  }, []);
+
+  const handleMockSendRequest = useCallback(() => {
+    handleSendRef.current(true);
+  }, []);
+
   const handleSendEvent = useCallback((eventName: string, data: string) => {
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(data);
@@ -587,9 +614,9 @@ function App() {
     } else if (!wsConnected && !loading) {
       // Not connected, store event and trigger connection
       pendingWsEventRef.current = { eventName, data };
-      handleSend(false);
+      handleSendRef.current(false);
     }
-  }, [socket, wsConnected, loading, handleSend]);
+  }, [socket, wsConnected, loading]);
 
   return (
     <div className="h-screen bg-bg-primary">
@@ -627,9 +654,9 @@ function App() {
                 <RequestBuilder
                   method={request.method}
                   url={request.url}
-                  onUrlChange={(url) => setRequest({ ...request, url })}
-                  onSend={() => handleSend(false)}
-                  onMockSend={mockMode && selectedEndpoint && selectedEndpoint.endpointType === 'http' ? () => handleSend(true) : undefined}
+                  onUrlChange={handleUrlChange}
+                  onSend={handleSendRequest}
+                  onMockSend={mockMode && selectedEndpoint && selectedEndpoint.endpointType === 'http' ? handleMockSendRequest : undefined}
                   loading={loading || (request.method === 'WS' && !wsConnected && !!socket)}
                   wsConnected={wsConnected}
                 />
@@ -657,9 +684,9 @@ function App() {
                         headers={request.headers}
                         body={request.body}
                         method={request.method}
-                        onParamsChange={(params) => setRequest({ ...request, params })}
-                        onHeadersChange={(headers) => setRequest({ ...request, headers })}
-                        onBodyChange={(body) => setRequest({ ...request, body })}
+                        onParamsChange={handleParamsChange}
+                        onHeadersChange={handleHeadersChange}
+                        onBodyChange={handleBodyChange}
                         requestSchema={selectedEndpoint?.request}
                         wsEvents={selectedEndpoint?.events}
                         onSendEvent={handleSendEvent}

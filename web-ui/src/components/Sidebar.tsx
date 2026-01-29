@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, memo } from 'react';
 import {
   Box,
   Text,
@@ -664,7 +664,7 @@ function UncategorizedGroup({
   );
 }
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   endpoints,
   categories,
   selectedId,
@@ -1005,4 +1005,4 @@ export function Sidebar({
       </Box>
     </Box>
   );
-}
+});

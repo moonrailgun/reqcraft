@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import {
   Box,
   Tabs,
@@ -68,7 +68,23 @@ const formatBody = (body: string, language: string): string => {
   return body;
 };
 
-export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected }: ResponsePanelProps) {
+const EDITOR_OPTIONS = {
+  readOnly: true,
+  minimap: { enabled: false },
+  fontSize: 14,
+  lineNumbers: 'on' as const,
+  scrollBeyondLastLine: false,
+  automaticLayout: true,
+  tabSize: 2,
+  wordWrap: 'on' as const,
+  padding: { top: 12 },
+  domReadOnly: true,
+};
+
+const PANEL_STYLE = { flex: 1, minHeight: 0, overflow: 'hidden' };
+const PANEL_HEADERS_STYLE = { flex: 1, minHeight: 0, overflow: 'auto' };
+
+export const ResponsePanel = memo(function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected }: ResponsePanelProps) {
   const { language, formattedBody } = useMemo(() => {
     if (!response) return { language: 'plaintext', formattedBody: '' };
     const lang = getLanguageFromContentType(response.headers);
@@ -241,28 +257,17 @@ export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected
           </Group>
         </Box>
 
-        <Tabs.Panel value="body" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} className="bg-bg-primary">
+        <Tabs.Panel value="body" style={PANEL_STYLE} className="bg-bg-primary">
           <Editor
             height="100%"
             language={language}
             value={formattedBody}
             theme="vs-dark"
-            options={{
-              readOnly: true,
-              minimap: { enabled: false },
-              fontSize: 14,
-              lineNumbers: 'on',
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              tabSize: 2,
-              wordWrap: 'on',
-              padding: { top: 12 },
-              domReadOnly: true,
-            }}
+            options={EDITOR_OPTIONS}
           />
         </Tabs.Panel>
 
-        <Tabs.Panel value="headers" style={{ flex: 1, minHeight: 0, overflow: 'auto' }} className="bg-bg-primary p-4">
+        <Tabs.Panel value="headers" style={PANEL_HEADERS_STYLE} className="bg-bg-primary p-4">
           <Table.ScrollContainer minWidth={400}>
             <Table>
               <Table.Tbody>
@@ -281,4 +286,4 @@ export function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected
       </Tabs>
     </Box>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import {
   Box,
   Tabs,
@@ -39,7 +39,193 @@ interface RequestTabsProps {
 
 const METHODS_WITH_BODY = ['POST', 'PUT', 'PATCH'];
 
-export function RequestTabs({
+const INPUT_STYLES = {
+  input: {
+    color: 'var(--color-text-primary)',
+  },
+};
+
+const TABS_STYLES = {
+  root: { display: 'flex', flexDirection: 'column' as const, flex: 1, minHeight: 0 },
+  panel: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' as const },
+};
+
+const BODY_BOX_STYLE = { position: 'relative' as const, flex: 1, minHeight: 0 };
+
+const LOAD_EXAMPLE_BUTTON_STYLE = {
+  position: 'absolute' as const,
+  bottom: 16,
+  right: 16,
+  zIndex: 10,
+};
+
+const EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  fontSize: 14,
+  lineNumbers: 'on' as const,
+  scrollBeyondLastLine: false,
+  automaticLayout: true,
+  tabSize: 2,
+  wordWrap: 'on' as const,
+  formatOnPaste: true,
+  formatOnType: true,
+  padding: { top: 12 },
+};
+
+interface KeyValueRowProps {
+  item: KeyValue;
+  index: number;
+  itemsLength: number;
+  onUpdate: (index: number, field: keyof KeyValue, value: string | boolean) => void;
+  onRemove: (index: number) => void;
+}
+
+const KeyValueRow = memo(function KeyValueRow({
+  item,
+  index,
+  itemsLength,
+  onUpdate,
+  onRemove,
+}: KeyValueRowProps) {
+  return (
+    <Table.Tr className="border-b border-border hover:bg-bg-hover">
+      <Table.Td>
+        <Checkbox
+          checked={item.enabled}
+          onChange={(e) => onUpdate(index, 'enabled', e.currentTarget.checked)}
+          color="orange"
+          size="sm"
+        />
+      </Table.Td>
+      <Table.Td>
+        <TextInput
+          value={item.key}
+          onChange={(e) => onUpdate(index, 'key', e.target.value)}
+          placeholder="Key"
+          variant="unstyled"
+          size="sm"
+          styles={INPUT_STYLES}
+        />
+      </Table.Td>
+      <Table.Td>
+        <TextInput
+          value={item.value}
+          onChange={(e) => onUpdate(index, 'value', e.target.value)}
+          placeholder="Value"
+          variant="unstyled"
+          size="sm"
+          styles={INPUT_STYLES}
+        />
+      </Table.Td>
+      <Table.Td>
+        {itemsLength > 1 && (
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="sm"
+            onClick={() => onRemove(index)}
+            className="hover:text-error"
+          >
+            <IconX size={14} />
+          </ActionIcon>
+        )}
+      </Table.Td>
+    </Table.Tr>
+  );
+});
+
+interface KeyValueTableProps {
+  items: KeyValue[];
+  onChange: (items: KeyValue[]) => void;
+}
+
+const KeyValueTable = memo(function KeyValueTable({ items, onChange }: KeyValueTableProps) {
+  const handleUpdate = useCallback(
+    (index: number, field: keyof KeyValue, value: string | boolean) => {
+      const newItems = [...items];
+      newItems[index] = { ...newItems[index], [field]: value };
+      if (
+        index === items.length - 1 &&
+        (newItems[index].key || newItems[index].value)
+      ) {
+        newItems.push({ key: '', value: '', enabled: true });
+      }
+      onChange(newItems);
+    },
+    [items, onChange]
+  );
+
+  const handleRemove = useCallback(
+    (index: number) => {
+      if (items.length === 1) return;
+      const newItems = items.filter((_, i) => i !== index);
+      onChange(newItems);
+    },
+    [items, onChange]
+  );
+
+  const filledItems = useMemo(
+    () => items.filter((item) => item.key || item.value),
+    [items]
+  );
+
+  const allSelected = useMemo(
+    () => filledItems.length > 0 && filledItems.every((item) => item.enabled),
+    [filledItems]
+  );
+
+  const partialSelected = useMemo(() => {
+    if (filledItems.length === 0) return false;
+    const enabledCount = filledItems.filter((item) => item.enabled).length;
+    return enabledCount > 0 && enabledCount < filledItems.length;
+  }, [filledItems]);
+
+  const handleToggleAll = useCallback(() => {
+    const newItems = items.map((item) => {
+      if (item.key || item.value) {
+        return { ...item, enabled: !allSelected };
+      }
+      return item;
+    });
+    onChange(newItems);
+  }, [items, onChange, allSelected]);
+
+  return (
+    <Table className="w-full">
+      <Table.Thead>
+        <Table.Tr className="border-b border-border">
+          <Table.Th w={40} className="text-text-secondary">
+            <Checkbox
+              checked={allSelected}
+              indeterminate={partialSelected}
+              onChange={handleToggleAll}
+              color="orange"
+              size="sm"
+              disabled={filledItems.length === 0}
+            />
+          </Table.Th>
+          <Table.Th className="text-text-secondary font-medium">Key</Table.Th>
+          <Table.Th className="text-text-secondary font-medium">Value</Table.Th>
+          <Table.Th w={40} />
+        </Table.Tr>
+      </Table.Thead>
+      <Table.Tbody>
+        {items.map((item, index) => (
+          <KeyValueRow
+            key={index}
+            item={item}
+            index={index}
+            itemsLength={items.length}
+            onUpdate={handleUpdate}
+            onRemove={handleRemove}
+          />
+        ))}
+      </Table.Tbody>
+    </Table>
+  );
+});
+
+export const RequestTabs = memo(function RequestTabs({
   params,
   headers,
   body,
@@ -120,169 +306,16 @@ export function RequestTabs({
     setSelectedWsEvent(null);
     setWsEventData('');
   };
-  const updateKeyValue = (
-    items: KeyValue[],
-    index: number,
-    field: keyof KeyValue,
-    value: string | boolean,
-    onChange: (items: KeyValue[]) => void
-  ) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-
-    if (
-      index === items.length - 1 &&
-      (newItems[index].key || newItems[index].value)
-    ) {
-      newItems.push({ key: '', value: '', enabled: true });
-    }
-
-    onChange(newItems);
-  };
-
-  const removeKeyValue = (
-    items: KeyValue[],
-    index: number,
-    onChange: (items: KeyValue[]) => void
-  ) => {
-    if (items.length === 1) return;
-    const newItems = items.filter((_, i) => i !== index);
-    onChange(newItems);
-  };
 
   const getActiveCount = (items: KeyValue[]) =>
     items.filter((p) => p.key).length;
-
-  const getFilledItems = (items: KeyValue[]) =>
-    items.filter((item) => item.key || item.value);
-
-  const isAllSelected = (items: KeyValue[]) => {
-    const filled = getFilledItems(items);
-    return filled.length > 0 && filled.every((item) => item.enabled);
-  };
-
-  const isPartialSelected = (items: KeyValue[]) => {
-    const filled = getFilledItems(items);
-    if (filled.length === 0) return false;
-    const enabledCount = filled.filter((item) => item.enabled).length;
-    return enabledCount > 0 && enabledCount < filled.length;
-  };
-
-  const toggleAllEnabled = (
-    items: KeyValue[],
-    onChange: (items: KeyValue[]) => void
-  ) => {
-    const allSelected = isAllSelected(items);
-    const newItems = items.map((item) => {
-      if (item.key || item.value) {
-        return { ...item, enabled: !allSelected };
-      }
-      return item;
-    });
-    onChange(newItems);
-  };
-
-  const renderKeyValueTable = (
-    items: KeyValue[],
-    onChange: (items: KeyValue[]) => void
-  ) => (
-    <Table className="w-full">
-      <Table.Thead>
-        <Table.Tr className="border-b border-border">
-          <Table.Th w={40} className="text-text-secondary">
-            <Checkbox
-              checked={isAllSelected(items)}
-              indeterminate={isPartialSelected(items)}
-              onChange={() => toggleAllEnabled(items, onChange)}
-              color="orange"
-              size="sm"
-              disabled={getFilledItems(items).length === 0}
-            />
-          </Table.Th>
-          <Table.Th className="text-text-secondary font-medium">Key</Table.Th>
-          <Table.Th className="text-text-secondary font-medium">Value</Table.Th>
-          <Table.Th w={40} />
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {items.map((item, index) => (
-          <Table.Tr key={index} className="border-b border-border hover:bg-bg-hover">
-            <Table.Td>
-              <Checkbox
-                checked={item.enabled}
-                onChange={(e) =>
-                  updateKeyValue(
-                    items,
-                    index,
-                    'enabled',
-                    e.currentTarget.checked,
-                    onChange
-                  )
-                }
-                color="orange"
-                size="sm"
-              />
-            </Table.Td>
-            <Table.Td>
-              <TextInput
-                value={item.key}
-                onChange={(e) =>
-                  updateKeyValue(items, index, 'key', e.target.value, onChange)
-                }
-                placeholder="Key"
-                variant="unstyled"
-                size="sm"
-                styles={{
-                  input: {
-                    color: 'var(--color-text-primary)',
-                  },
-                }}
-              />
-            </Table.Td>
-            <Table.Td>
-              <TextInput
-                value={item.value}
-                onChange={(e) =>
-                  updateKeyValue(items, index, 'value', e.target.value, onChange)
-                }
-                placeholder="Value"
-                variant="unstyled"
-                size="sm"
-                styles={{
-                  input: {
-                    color: 'var(--color-text-primary)',
-                  },
-                }}
-              />
-            </Table.Td>
-            <Table.Td>
-              {items.length > 1 && (
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="sm"
-                  onClick={() => removeKeyValue(items, index, onChange)}
-                  className="hover:text-error"
-                >
-                  <IconX size={14} />
-                </ActionIcon>
-              )}
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
-  );
 
   return (
     <Tabs
       value={activeTab}
       onChange={setActiveTab}
       className="flex-1 flex flex-col min-h-0"
-      styles={{
-        root: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 },
-        panel: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' },
-      }}
+      styles={TABS_STYLES}
     >
       <Tabs.List className="bg-bg-secondary border-b border-border">
         {!isWs && (
@@ -321,18 +354,18 @@ export function RequestTabs({
       {!isWs && (
         <>
           <Tabs.Panel value="params" className="overflow-auto bg-bg-primary">
-            {renderKeyValueTable(params, onParamsChange)}
+            <KeyValueTable items={params} onChange={onParamsChange} />
           </Tabs.Panel>
 
           <Tabs.Panel value="headers" className="overflow-auto bg-bg-primary">
-            {renderKeyValueTable(headers, onHeadersChange)}
+            <KeyValueTable items={headers} onChange={onHeadersChange} />
           </Tabs.Panel>
         </>
       )}
 
       {showBodyTab && (
         <Tabs.Panel value="body" className="overflow-hidden bg-bg-primary">
-          <Box style={{ position: 'relative', flex: 1, minHeight: 0 }}>
+          <Box style={BODY_BOX_STYLE}>
             {hasExample && (
               <Tooltip label="Load Example" position="left">
                 <ActionIcon
@@ -340,12 +373,7 @@ export function RequestTabs({
                   color="orange"
                   size="md"
                   onClick={handleLoadExample}
-                  style={{
-                    position: 'absolute',
-                    bottom: 16,
-                    right: 16,
-                    zIndex: 10,
-                  }}
+                  style={LOAD_EXAMPLE_BUTTON_STYLE}
                 >
                   <IconFileImport size={16} />
                 </ActionIcon>
@@ -357,18 +385,7 @@ export function RequestTabs({
               value={body}
               onChange={(value) => onBodyChange(value || '')}
               theme="vs-dark"
-              options={{
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: 2,
-                wordWrap: 'on',
-                formatOnPaste: true,
-                formatOnType: true,
-                padding: { top: 12 },
-              }}
+              options={EDITOR_OPTIONS}
             />
           </Box>
         </Tabs.Panel>
@@ -403,25 +420,14 @@ export function RequestTabs({
                   Send
                 </Button>
               </Box>
-              <Box style={{ flex: 1, minHeight: 0 }}>
+              <Box style={BODY_BOX_STYLE}>
                 <Editor
                   height="100%"
                   defaultLanguage="json"
                   value={wsEventData}
                   onChange={(value) => setWsEventData(value || '')}
                   theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    tabSize: 2,
-                    wordWrap: 'on',
-                    formatOnPaste: true,
-                    formatOnType: true,
-                    padding: { top: 12 },
-                  }}
+                  options={EDITOR_OPTIONS}
                 />
               </Box>
             </Box>
@@ -484,4 +490,4 @@ export function RequestTabs({
       )}
     </Tabs>
   );
-}
+});
