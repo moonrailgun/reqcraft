@@ -153,6 +153,35 @@ export function RequestTabs({
   const getActiveCount = (items: KeyValue[]) =>
     items.filter((p) => p.key).length;
 
+  const getFilledItems = (items: KeyValue[]) =>
+    items.filter((item) => item.key || item.value);
+
+  const isAllSelected = (items: KeyValue[]) => {
+    const filled = getFilledItems(items);
+    return filled.length > 0 && filled.every((item) => item.enabled);
+  };
+
+  const isPartialSelected = (items: KeyValue[]) => {
+    const filled = getFilledItems(items);
+    if (filled.length === 0) return false;
+    const enabledCount = filled.filter((item) => item.enabled).length;
+    return enabledCount > 0 && enabledCount < filled.length;
+  };
+
+  const toggleAllEnabled = (
+    items: KeyValue[],
+    onChange: (items: KeyValue[]) => void
+  ) => {
+    const allSelected = isAllSelected(items);
+    const newItems = items.map((item) => {
+      if (item.key || item.value) {
+        return { ...item, enabled: !allSelected };
+      }
+      return item;
+    });
+    onChange(newItems);
+  };
+
   const renderKeyValueTable = (
     items: KeyValue[],
     onChange: (items: KeyValue[]) => void
@@ -160,7 +189,16 @@ export function RequestTabs({
     <Table className="w-full">
       <Table.Thead>
         <Table.Tr className="border-b border-border">
-          <Table.Th w={40} className="text-text-secondary" />
+          <Table.Th w={40} className="text-text-secondary">
+            <Checkbox
+              checked={isAllSelected(items)}
+              indeterminate={isPartialSelected(items)}
+              onChange={() => toggleAllEnabled(items, onChange)}
+              color="orange"
+              size="sm"
+              disabled={getFilledItems(items).length === 0}
+            />
+          </Table.Th>
           <Table.Th className="text-text-secondary font-medium">Key</Table.Th>
           <Table.Th className="text-text-secondary font-medium">Value</Table.Th>
           <Table.Th w={40} />
