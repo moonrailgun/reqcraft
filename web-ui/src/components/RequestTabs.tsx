@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback, memo } from 'react';
+import { useMemo, useState, useCallback, memo } from 'react';
 import {
   Box,
   Tabs,
@@ -257,29 +257,34 @@ export const RequestTabs = memo(function RequestTabs({
     return tabs;
   }, [isWs, showBodyTab]);
 
-  const [activeTab, setActiveTab] = useState<string | null>(() =>
-    isWs ? 'events' : 'params'
-  );
+  const getDefaultTab = () => {
+    if (isWs) return 'events';
+    if (showBodyTab) return 'body';
+    return 'params';
+  };
 
-  // Switch to valid tab when available tabs change
-  useEffect(() => {
-    if (activeTab && !availableTabs.includes(activeTab)) {
-      setActiveTab(availableTabs[0] || null);
-    }
-  }, [availableTabs, activeTab]);
+  const [activeTab, setActiveTab] = useState<string | null>(getDefaultTab);
+  const [prevMethod, setPrevMethod] = useState(methodUpper);
+  const [prevWsEvents, setPrevWsEvents] = useState(wsEvents);
 
-  // Reset to default tab when switching endpoint type
-  useEffect(() => {
-    setActiveTab(isWs ? 'events' : 'params');
+  // Adjust state during render when method changes (React recommended pattern)
+  if (prevMethod !== methodUpper) {
+    setPrevMethod(methodUpper);
+    setActiveTab(getDefaultTab());
     setSelectedWsEvent(null);
     setWsEventData('');
-  }, [isWs]);
+  }
 
-  // Reset selected event when wsEvents change (endpoint changed)
-  useEffect(() => {
+  // Adjust state during render when wsEvents change
+  if (prevWsEvents !== wsEvents) {
+    setPrevWsEvents(wsEvents);
     setSelectedWsEvent(null);
     setWsEventData('');
-  }, [wsEvents]);
+  }
+
+  // Ensure activeTab is valid
+  const effectiveActiveTab =
+    activeTab && availableTabs.includes(activeTab) ? activeTab : getDefaultTab();
 
   const hasExample = useMemo(() => {
     return hasBodyFields(requestSchema);
@@ -312,7 +317,7 @@ export const RequestTabs = memo(function RequestTabs({
 
   return (
     <Tabs
-      value={activeTab}
+      value={effectiveActiveTab}
       onChange={setActiveTab}
       className="flex-1 flex flex-col min-h-0"
       styles={TABS_STYLES}
