@@ -1,4 +1,4 @@
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { Box, TextInput, Button, Group, Tooltip, Badge } from '@mantine/core';
 import { IconSend, IconLoader2, IconMask, IconPlugConnected, IconPlugConnectedX } from '@tabler/icons-react';
 import type { HttpMethod } from '../App';
@@ -102,10 +102,10 @@ export const RequestBuilder = memo(function RequestBuilder({
             )
           }
         >
-          {loading 
-            ? (isWs ? 'Connecting...' : 'Sending...') 
-            : isWs 
-              ? (wsConnected ? 'Disconnect' : 'Connect') 
+          {loading
+            ? (isWs ? 'Connecting...' : 'Sending...')
+            : isWs
+              ? (wsConnected ? 'Disconnect' : 'Connect')
               : 'Send'}
         </Button>
 
