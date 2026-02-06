@@ -130,19 +130,24 @@ async fn dev_server(
     }
 
     let config = Arc::new(RwLock::new(config));
+    let (reload_tx, _) = tokio::sync::broadcast::channel::<()>(16);
 
     if watch {
         info!("Watch mode enabled - watching for .rqc file changes");
         let config_clone = Arc::clone(&config);
-        start_watcher(config_clone)?;
+        let reload_tx_clone = reload_tx.clone();
+        start_watcher(config_clone, reload_tx_clone)?;
     }
 
-    web::start_server(host, port, config, mock_mode, cors_mode).await?;
+    web::start_server(host, port, config, mock_mode, cors_mode, reload_tx).await?;
 
     Ok(())
 }
 
-fn start_watcher(config: Arc<RwLock<RqcConfig>>) -> Result<(), Box<dyn std::error::Error>> {
+fn start_watcher(
+    config: Arc<RwLock<RqcConfig>>,
+    reload_tx: tokio::sync::broadcast::Sender<()>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
 
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
@@ -182,6 +187,8 @@ fn start_watcher(config: Arc<RwLock<RqcConfig>>) -> Result<(), Box<dyn std::erro
                     info!("Reloaded {} API endpoints from {}", endpoints.len(), RQC_FILE);
                     let mut config_guard = config.write().unwrap();
                     *config_guard = new_config;
+                    drop(config_guard);
+                    let _ = reload_tx.send(());
                 }
                 Err(e) => {
                     warn!("Failed to reload config: {}", e);

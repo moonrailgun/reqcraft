@@ -128,9 +128,15 @@ function App() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [loading, setLoading] = useState(false);
   const pendingWsEventRef = useRef<{ eventName: string; data: string } | null>(null);
+  const selectedEndpointRef = useRef<ApiEndpoint | null>(null);
+  const selectedCategoryRef = useRef<CategoryInfo | null>(null);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [variables, setVariables] = useState<Variable[]>(() => loadVariables());
   const [configHeaders, setConfigHeaders] = useState<ConfigHeader[]>(() => loadConfigHeaders());
+
+  // Keep refs in sync for hot-reload lookups
+  useEffect(() => { selectedEndpointRef.current = selectedEndpoint; }, [selectedEndpoint]);
+  useEffect(() => { selectedCategoryRef.current = selectedCategory; }, [selectedCategory]);
 
   const handleVariablesChange = useCallback((newVariables: Variable[]) => {
     setVariables(newVariables);
@@ -172,8 +178,7 @@ function App() {
     return expandedCategoryIds;
   }, [selectedEndpoint, categories, expandedCategoryIds, findCategoryPath]);
 
-  useEffect(() => {
-    // Fetch API info to check mock mode, cors mode and base URLs
+  const fetchApiData = useCallback((restoreFromUrl = false) => {
     fetch('/api/info')
       .then((res) => res.json())
       .then((data: ApiInfo) => {
@@ -186,64 +191,82 @@ function App() {
       })
       .catch(console.error);
 
-    // Fetch endpoints
     fetch('/api/endpoints')
       .then((res) => res.json())
       .then((data: ApiEndpoint[]) => {
         setEndpoints(data);
 
-        // Restore selected endpoint from URL
-        const params = new URLSearchParams(window.location.search);
-        const path = params.get('path');
-        const method = params.get('method');
-        const type = params.get('type');
-        const variablesParam = params.get('variables');
-        
-        if (variablesParam === '1') {
-          setVariablesSelected(true);
-        } else if (path) {
-          let endpoint: ApiEndpoint | undefined;
-          if (type === 'ws') {
-            // WebSocket endpoint - match by path only
-            endpoint = data.find((e) => e.path === path && e.endpointType === 'websocket');
-          } else if (method) {
-            // HTTP endpoint - match by path and method
-            endpoint = data.find((e) => e.path === path && e.method === method);
+        if (restoreFromUrl) {
+          const params = new URLSearchParams(window.location.search);
+          const path = params.get('path');
+          const method = params.get('method');
+          const type = params.get('type');
+          const variablesParam = params.get('variables');
+
+          if (variablesParam === '1') {
+            setVariablesSelected(true);
+          } else if (path) {
+            let endpoint: ApiEndpoint | undefined;
+            if (type === 'ws') {
+              endpoint = data.find((e) => e.path === path && e.endpointType === 'websocket');
+            } else if (method) {
+              endpoint = data.find((e) => e.path === path && e.method === method);
+            }
+            if (endpoint) {
+              setSelectedEndpoint(endpoint);
+            }
           }
-          if (endpoint) {
-            setSelectedEndpoint(endpoint);
+        } else {
+          // Reload: refresh selected endpoint with updated data
+          const current = selectedEndpointRef.current;
+          if (current) {
+            const updated = data.find((e) => e.id === current.id);
+            setSelectedEndpoint(updated ?? null);
           }
         }
       })
       .catch(console.error);
 
-    // Fetch categories
     fetch('/api/categories')
       .then((res) => res.json())
       .then((data: CategoryInfo[]) => {
         setCategories(data);
 
-        // Restore selected category from URL
-        const params = new URLSearchParams(window.location.search);
-        const categoryId = params.get('category');
-        if (categoryId) {
-          const findCategory = (cats: CategoryInfo[]): CategoryInfo | undefined => {
-            for (const cat of cats) {
-              if (cat.id === categoryId) return cat;
-              const found = findCategory(cat.children);
-              if (found) return found;
+        if (restoreFromUrl) {
+          const params = new URLSearchParams(window.location.search);
+          const categoryId = params.get('category');
+          if (categoryId) {
+            const findCat = (cats: CategoryInfo[]): CategoryInfo | undefined => {
+              for (const cat of cats) {
+                if (cat.id === categoryId) return cat;
+                const found = findCat(cat.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
+            const category = findCat(data);
+            if (category) {
+              setSelectedCategory(category);
             }
-            return undefined;
-          };
-          const category = findCategory(data);
-          if (category) {
-            setSelectedCategory(category);
+          }
+        } else {
+          // Reload: refresh selected category with updated data
+          const current = selectedCategoryRef.current;
+          if (current) {
+            const findCat = (cats: CategoryInfo[]): CategoryInfo | undefined => {
+              for (const cat of cats) {
+                if (cat.id === current.id) return cat;
+                const found = findCat(cat.children);
+                if (found) return found;
+              }
+              return undefined;
+            };
+            setSelectedCategory(findCat(data) ?? null);
           }
         }
       })
       .catch(console.error);
 
-    // Fetch config variables and merge with local variables
     fetch('/api/variables')
       .then((res) => res.json())
       .then((configVars: VariableDefinition[]) => {
@@ -253,7 +276,6 @@ function App() {
       })
       .catch(console.error);
 
-    // Fetch config headers and merge with saved headers
     fetch('/api/headers')
       .then((res) => res.json())
       .then((configHeaderDefs: HeaderDefinition[]) => {
@@ -263,6 +285,44 @@ function App() {
       })
       .catch(console.error);
   }, []);
+
+  // Initial data load
+  useEffect(() => {
+    fetchApiData(true);
+  }, [fetchApiData]);
+
+  // WebSocket for hot-reload notifications
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    function connect() {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'reload') {
+            console.log('[reqcraft] Config changed, reloading data...');
+            fetchApiData(false);
+          }
+        } catch {
+          // ignore non-JSON messages
+        }
+      };
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+    }
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  }, [fetchApiData]);
 
   // Remove tabindex from resize handles to prevent focus ring
   useEffect(() => {

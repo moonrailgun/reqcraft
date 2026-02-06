@@ -1,6 +1,9 @@
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Path, State,
+    },
     http::{header, HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode, Uri},
     response::{IntoResponse, Response},
     routing::{any, get},
@@ -26,6 +29,7 @@ pub struct AppState {
     pub mock_mode: bool,
     pub cors_mode: bool,
     pub http_client: reqwest::Client,
+    pub reload_tx: tokio::sync::broadcast::Sender<()>,
 }
 
 #[derive(Serialize)]
@@ -45,6 +49,7 @@ pub async fn start_server(
     config: Arc<RwLock<RqcConfig>>,
     mock_mode: bool,
     cors_mode: bool,
+    reload_tx: tokio::sync::broadcast::Sender<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let http_client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -55,6 +60,7 @@ pub async fn start_server(
         mock_mode,
         cors_mode,
         http_client,
+        reload_tx,
     };
 
     let cors = CorsLayer::new()
@@ -68,7 +74,8 @@ pub async fn start_server(
         .route("/api/endpoints", get(get_endpoints))
         .route("/api/categories", get(get_categories))
         .route("/api/variables", get(get_variables))
-        .route("/api/headers", get(get_headers));
+        .route("/api/headers", get(get_headers))
+        .route("/ws", get(ws_handler));
 
     // Add mock proxy endpoint in mock mode
     if mock_mode {
@@ -377,6 +384,35 @@ async fn cors_proxy_handler(
                 })),
             )
                 .into_response()
+        }
+    }
+}
+
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+    ws.on_upgrade(|socket| handle_ws(socket, state))
+}
+
+async fn handle_ws(mut socket: WebSocket, state: AppState) {
+    let mut rx = state.reload_tx.subscribe();
+    loop {
+        tokio::select! {
+            result = rx.recv() => {
+                match result {
+                    Ok(()) => {
+                        let msg = Message::Text(r#"{"type":"reload"}"#.into());
+                        if socket.send(msg).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            msg = socket.recv() => {
+                match msg {
+                    Some(Ok(Message::Close(_))) | None => break,
+                    _ => {}
+                }
+            }
         }
     }
 }
