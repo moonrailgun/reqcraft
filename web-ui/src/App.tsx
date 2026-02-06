@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
+import { Drawer } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { IconSchema } from '@tabler/icons-react';
 import { Sidebar } from './components/Sidebar';
 import { RequestBuilder } from './components/RequestBuilder';
 import { RequestTabs } from './components/RequestTabs';
@@ -8,6 +11,7 @@ import { WelcomePage } from './components/WelcomePage';
 import { CategoryDetailPage } from './components/CategoryDetailPage';
 import { CommandPalette } from './components/CommandPalette';
 import { VariablesPage } from './components/VariablesPage';
+import { SchemaPanel } from './components/SchemaPanel';
 import {
   type Variable,
   type VariableDefinition,
@@ -132,6 +136,7 @@ function App() {
   const selectedEndpointRef = useRef<ApiEndpoint | null>(null);
   const selectedCategoryRef = useRef<CategoryInfo | null>(null);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
+  const [schemaDrawerOpened, { open: openSchemaDrawer, close: closeSchemaDrawer }] = useDisclosure(false);
   const [variables, setVariables] = useState<Variable[]>(() => loadVariables());
   const [configHeaders, setConfigHeaders] = useState<ConfigHeader[]>(() => loadConfigHeaders());
 
@@ -561,7 +566,7 @@ function App() {
             url.searchParams.append(p.key, p.value);
           }
         });
-        
+
         // If CORS mode is enabled, proxy through local server
         if (corsMode) {
           const encodedUrl = encodeURIComponent(url.toString());
@@ -572,14 +577,14 @@ function App() {
       }
 
       const headers: Record<string, string> = {};
-      
+
       // Add config headers first (can be overridden by request headers)
       configHeaders.forEach((h) => {
         if (h.enabled && h.name) {
           headers[h.name] = replaceVariables(h.value, variables);
         }
       });
-      
+
       // Add request-specific headers (override config headers)
       resolvedHeaders.forEach((h) => {
         if (h.enabled && h.key) {
@@ -699,20 +704,27 @@ function App() {
                   {/* Request Panel */}
                   <Panel defaultSize="50%" minSize="25%">
                     <div className="h-full flex flex-col border-r border-border">
-                      {(selectedEndpoint?.name || selectedEndpoint?.description) && (
-                        <div className="px-4 py-3 bg-bg-secondary border-b border-border">
+                      <div className="flex items-center justify-between px-4 py-2 bg-bg-secondary border-b border-border">
+                        <div className="flex-1 min-w-0">
                           {selectedEndpoint?.name && (
                             <div className="text-lg font-semibold text-text-primary">
                               {selectedEndpoint.name}
                             </div>
                           )}
                           {selectedEndpoint?.description && (
-                            <div className="text-sm text-text-secondary mt-1">
+                            <div className="text-sm text-text-secondary mt-0.5">
                               {selectedEndpoint.description}
                             </div>
                           )}
                         </div>
-                      )}
+                        <button
+                          onClick={openSchemaDrawer}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors cursor-pointer shrink-0 ml-2"
+                        >
+                          <IconSchema size={14} />
+                          Schema
+                        </button>
+                      </div>
                       <RequestTabs
                         params={request.params}
                         headers={request.headers}
@@ -733,9 +745,9 @@ function App() {
                   {/* Response Panel */}
                   <Panel defaultSize="50%" minSize="25%">
                     <div className="h-full flex flex-col">
-                      <ResponsePanel 
-                        response={response} 
-                        loading={loading} 
+                      <ResponsePanel
+                        response={response}
+                        loading={loading}
                         isWs={request.method === 'WS'}
                         wsMessages={wsMessages}
                         wsConnected={wsConnected}
@@ -764,6 +776,29 @@ function App() {
           </div>
         </Panel>
       </PanelGroup>
+
+      <Drawer
+        opened={schemaDrawerOpened}
+        onClose={closeSchemaDrawer}
+        title="Schema"
+        position="right"
+        size={480}
+        styles={{
+          content: { backgroundColor: 'var(--color-bg-primary)' },
+          header: { backgroundColor: 'var(--color-bg-secondary)', borderBottom: '1px solid var(--color-border)' },
+          title: { fontWeight: 600 },
+        }}
+      >
+        {selectedEndpoint && (
+          <div className="pt-4">
+            <SchemaPanel
+              requestSchema={selectedEndpoint.request}
+              responseSchema={selectedEndpoint.response}
+              wsEvents={selectedEndpoint.events}
+            />
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
