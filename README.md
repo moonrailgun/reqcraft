@@ -23,7 +23,8 @@ A powerful API testing tool powered by DSL configuration.
 curl -fsSL https://raw.githubusercontent.com/moonrailgun/reqcraft/master/install.sh | bash
 ```
 
-### Manual Installation
+<details>
+<summary><h3>Manual Installation</h3></summary>
 
 Download the latest release for your platform from [GitHub Releases](https://github.com/moonrailgun/reqcraft/releases).
 
@@ -50,6 +51,8 @@ sudo mv reqcraft /usr/local/bin/
 
 #### Windows
 Download `reqcraft-x86_64-pc-windows-msvc.zip` from the releases page and add to your PATH.
+
+</details>
 
 ### From Source
 
