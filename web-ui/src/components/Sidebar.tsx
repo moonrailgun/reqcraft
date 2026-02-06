@@ -22,6 +22,7 @@ import {
 } from '@tabler/icons-react';
 import type { ApiEndpoint, CategoryInfo } from '../App';
 import type { Variable } from '../utils/variables';
+import { useServiceWSStore } from '../store/useWebSocketStore';
 
 interface SidebarProps {
   endpoints: ApiEndpoint[];
@@ -693,6 +694,7 @@ export const Sidebar = memo(function Sidebar({
   );
 
   const activeVariableCount = variables.filter((v) => v.name && v.enabled).length;
+  const wsConnected = useServiceWSStore((s) => s.connected);
 
   return (
     <Box
@@ -966,12 +968,12 @@ export const Sidebar = memo(function Sidebar({
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                backgroundColor: '#22c55e',
-                boxShadow: '0 0 6px rgba(34, 197, 94, 0.5)',
+                backgroundColor: wsConnected ? '#22c55e' : '#ef4444',
+                boxShadow: wsConnected ? '0 0 6px rgba(34, 197, 94, 0.5)' : 'none',
               }}
             />
             <Text size="xs" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-              Connected
+              {wsConnected ? 'Connected' : 'Disconnected'}
             </Text>
           </Group>
           <Group gap={2}>
@@ -1006,3 +1008,4 @@ export const Sidebar = memo(function Sidebar({
     </Box>
   );
 });
+Sidebar.displayName = 'Sidebar'

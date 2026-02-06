@@ -23,6 +23,7 @@ import {
   mergeConfigHeaders,
 } from './utils/variables';
 import { generateExampleFromSchema, hasBodyFields } from './utils/schema';
+import { useServiceWSStore } from './store/useWebSocketStore';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
 
@@ -291,38 +292,13 @@ function App() {
     fetchApiData(true);
   }, [fetchApiData]);
 
-  // WebSocket for hot-reload notifications
+  // Connect to backend service WebSocket for hot-reload
+  const connectServiceWS = useServiceWSStore((s) => s.connect);
+  const disconnectServiceWS = useServiceWSStore((s) => s.disconnect);
   useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout>;
-
-    function connect() {
-      ws = new WebSocket(wsUrl);
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'reload') {
-            console.log('[reqcraft] Config changed, reloading data...');
-            fetchApiData(false);
-          }
-        } catch {
-          // ignore non-JSON messages
-        }
-      };
-      ws.onclose = () => {
-        reconnectTimer = setTimeout(connect, 3000);
-      };
-    }
-
-    connect();
-
-    return () => {
-      clearTimeout(reconnectTimer);
-      ws?.close();
-    };
-  }, [fetchApiData]);
+    connectServiceWS(() => fetchApiData(false));
+    return () => disconnectServiceWS();
+  }, [connectServiceWS, disconnectServiceWS, fetchApiData]);
 
   // Remove tabindex from resize handles to prevent focus ring
   useEffect(() => {
@@ -535,8 +511,7 @@ function App() {
           setLoading(false);
           setSocket(ws);
           setWsMessages(prev => [...prev, { type: 'received', data: 'Connected to ' + resolvedUrl, time: Date.now() }]);
-          
-          // Send pending event if exists
+
           if (pendingWsEventRef.current) {
             const { eventName, data } = pendingWsEventRef.current;
             ws.send(data);
@@ -672,7 +647,6 @@ function App() {
       socket.send(data);
       setWsMessages(prev => [...prev, { type: 'sent', data, time: Date.now(), event: eventName }]);
     } else if (!wsConnected && !loading) {
-      // Not connected, store event and trigger connection
       pendingWsEventRef.current = { eventName, data };
       handleSendRef.current(false);
     }
