@@ -10,7 +10,7 @@ use rust_embed::Embed;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
@@ -22,7 +22,7 @@ struct Assets;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub config: Arc<RqcConfig>,
+    pub config: Arc<RwLock<RqcConfig>>,
     pub mock_mode: bool,
     pub cors_mode: bool,
     pub http_client: reqwest::Client,
@@ -42,7 +42,7 @@ pub struct ApiInfo {
 pub async fn start_server(
     host: &str,
     port: u16,
-    config: RqcConfig,
+    config: Arc<RwLock<RqcConfig>>,
     mock_mode: bool,
     cors_mode: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -51,7 +51,7 @@ pub async fn start_server(
         .build()?;
 
     let state = AppState {
-        config: Arc::new(config),
+        config,
         mock_mode,
         cors_mode,
         http_client,
@@ -119,11 +119,12 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 }
 
 async fn api_info(State(state): State<AppState>) -> Json<ApiInfo> {
-    let endpoints = state.config.to_endpoints();
+    let config = state.config.read().unwrap();
+    let endpoints = config.to_endpoints();
     Json(ApiInfo {
         name: "reqcraft".to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
-        base_urls: state.config.get_base_urls(),
+        base_urls: config.get_base_urls(),
         endpoint_count: endpoints.len(),
         mock_mode: state.mock_mode,
         cors_mode: state.cors_mode,
@@ -131,21 +132,24 @@ async fn api_info(State(state): State<AppState>) -> Json<ApiInfo> {
 }
 
 async fn get_config(State(state): State<AppState>) -> Json<RqcConfig> {
-    Json((*state.config).clone())
+    let config = state.config.read().unwrap();
+    Json(config.clone())
 }
 
 async fn get_endpoints(State(state): State<AppState>) -> Json<Vec<ApiEndpoint>> {
-    Json(state.config.to_endpoints())
+    let config = state.config.read().unwrap();
+    Json(config.to_endpoints())
 }
 
 async fn get_categories(State(state): State<AppState>) -> Json<Vec<CategoryInfo>> {
-    Json(state.config.to_categories())
+    let config = state.config.read().unwrap();
+    Json(config.to_categories())
 }
 
 async fn get_variables(State(state): State<AppState>) -> Json<Vec<VariableDefinition>> {
+    let config = state.config.read().unwrap();
     Json(
-        state
-            .config
+        config
             .config
             .as_ref()
             .map(|c| c.variables.clone())
@@ -154,9 +158,9 @@ async fn get_variables(State(state): State<AppState>) -> Json<Vec<VariableDefini
 }
 
 async fn get_headers(State(state): State<AppState>) -> Json<Vec<HeaderDefinition>> {
+    let config = state.config.read().unwrap();
     Json(
-        state
-            .config
+        config
             .config
             .as_ref()
             .map(|c| c.headers.clone())
@@ -173,7 +177,8 @@ async fn mock_handler(
     let request_path = format!("/{}", path);
 
     // Find matching API endpoint from flattened endpoints list
-    let endpoints = state.config.to_endpoints();
+    let config = state.config.read().unwrap();
+    let endpoints = config.to_endpoints();
     for endpoint in &endpoints {
         if endpoint.endpoint_type == EndpointType::Http
             && endpoint.path == request_path

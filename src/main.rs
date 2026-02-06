@@ -4,10 +4,12 @@ mod parser;
 mod web;
 
 use cli::{Cli, Commands};
+use notify::{Event, EventKind, RecursiveMode, Watcher};
 use parser::{Parser, RqcConfig};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -29,8 +31,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Init => {
             init_project()?;
         }
-        Commands::Dev { port, host, mock, cors } => {
-            dev_server(&host, port, mock, cors).await?;
+        Commands::Dev { port, host, mock, cors, watch } => {
+            dev_server(&host, port, mock, cors, watch).await?;
         }
     }
 
@@ -97,6 +99,7 @@ async fn dev_server(
     port: u16,
     cli_mock: bool,
     cli_cors: bool,
+    watch: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let rqc_path = Path::new(RQC_FILE);
 
@@ -126,7 +129,66 @@ async fn dev_server(
         info!("CORS proxy mode enabled");
     }
 
+    let config = Arc::new(RwLock::new(config));
+
+    if watch {
+        info!("Watch mode enabled - watching for .rqc file changes");
+        let config_clone = Arc::clone(&config);
+        start_watcher(config_clone)?;
+    }
+
     web::start_server(host, port, config, mock_mode, cors_mode).await?;
+
+    Ok(())
+}
+
+fn start_watcher(config: Arc<RwLock<RqcConfig>>) -> Result<(), Box<dyn std::error::Error>> {
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
+
+    let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
+        if let Ok(event) = res {
+            let is_rqc_change = matches!(
+                event.kind,
+                EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_)
+            ) && event.paths.iter().any(|p| {
+                p.extension().and_then(|e| e.to_str()) == Some("rqc")
+                    || p.file_name().and_then(|n| n.to_str()) == Some(".rqc")
+            });
+
+            if is_rqc_change {
+                let _ = tx.try_send(());
+            }
+        }
+    })?;
+
+    let watch_dir = Path::new(".");
+    watcher.watch(watch_dir, RecursiveMode::Recursive)?;
+
+    tokio::spawn(async move {
+        let _watcher = watcher; // keep watcher alive
+        while rx.recv().await.is_some() {
+            // Debounce: drain pending events and wait 500ms
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            while rx.try_recv().is_ok() {}
+
+            info!("Detected .rqc file changes, reloading...");
+
+            let rqc_path = Path::new(RQC_FILE);
+            let base_dir = rqc_path.parent().unwrap_or(Path::new("."));
+
+            match parse_with_imports(rqc_path, base_dir) {
+                Ok(new_config) => {
+                    let endpoints = new_config.to_endpoints();
+                    info!("Reloaded {} API endpoints from {}", endpoints.len(), RQC_FILE);
+                    let mut config_guard = config.write().unwrap();
+                    *config_guard = new_config;
+                }
+                Err(e) => {
+                    warn!("Failed to reload config: {}", e);
+                }
+            }
+        }
+    });
 
     Ok(())
 }

@@ -30,6 +30,10 @@ pub enum Commands {
         /// Enable CORS proxy mode - proxy requests through local server to bypass CORS
         #[arg(short, long, default_value = "false")]
         cors: bool,
+
+        /// Enable watch mode - auto reload on .rqc file changes
+        #[arg(short, long, default_value = "false")]
+        watch: bool,
     },
 }
 
