@@ -54,7 +54,8 @@ Download `reqcraft-x86_64-pc-windows-msvc.zip` from the releases page and add to
 
 </details>
 
-### From Source
+<details>
+<summary><h3>From Source</h3></summary>
 
 ```bash
 git clone https://github.com/moonrailgun/reqcraft.git
@@ -62,6 +63,8 @@ cd reqcraft
 cd web-ui && npm install && npm run build && cd ..
 cargo build --release
 ```
+
+</details>
 
 ## Quick Start
 
