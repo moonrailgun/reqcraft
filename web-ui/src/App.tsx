@@ -30,7 +30,7 @@ import { generateExampleFromSchema, hasBodyFields } from './utils/schema';
 import { useServiceWSStore } from './store/useWebSocketStore';
 import { io as sioConnect, type Socket as SioSocket } from 'socket.io-client';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS' | 'SIO';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS' | 'SIO' | 'SSE';
 
 export interface KeyValue {
   key: string;
@@ -61,9 +61,14 @@ export interface WsEvent {
   response?: SchemaBlock;
 }
 
+export interface SseEvent {
+  name: string;
+  fields: Field[];
+}
+
 export interface ApiEndpoint {
   id: string;
-  endpointType: 'http' | 'websocket' | 'socketio';
+  endpointType: 'http' | 'websocket' | 'socketio' | 'sse';
   path: string;
   fullUrl: string | null;
   method: string | null;
@@ -72,6 +77,7 @@ export interface ApiEndpoint {
   request?: SchemaBlock;
   response?: SchemaBlock;
   events?: WsEvent[];
+  sseEvents?: SseEvent[];
   auth?: SchemaBlock;
   connectHeaders?: SchemaBlock;
   categoryId?: string;
@@ -135,6 +141,7 @@ function App() {
   const [wsConnected, setWsConnected] = useState(false);
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [sioSocket, setSioSocket] = useState<SioSocket | null>(null);
+  const [sseAbort, setSseAbort] = useState<AbortController | null>(null);
   const [loading, setLoading] = useState(false);
   const pendingWsEventRef = useRef<{ eventName: string; data: string } | null>(null);
   const selectedEndpointRef = useRef<ApiEndpoint | null>(null);
@@ -221,6 +228,8 @@ function App() {
               endpoint = data.find((e) => e.path === path && e.endpointType === 'websocket');
             } else if (type === 'sio') {
               endpoint = data.find((e) => e.path === path && e.endpointType === 'socketio');
+            } else if (type === 'sse') {
+              endpoint = data.find((e) => e.path === path && e.endpointType === 'sse');
             } else if (method) {
               endpoint = data.find((e) => e.path === path && e.method === method);
             }
@@ -326,6 +335,7 @@ function App() {
 
   const getFullUrl = useCallback(
     (path: string, baseUrl?: string) => {
+      if (/^https?:\/\//i.test(path)) return path;
       const base = baseUrl || selectedBaseUrl;
       if (base) {
         return `${base.replace(/\/$/, '')}${path}`;
@@ -353,7 +363,8 @@ function App() {
       // Determine method based on endpoint type
       const isWebSocket = selectedEndpoint.endpointType === 'websocket';
       const isSocketio = selectedEndpoint.endpointType === 'socketio';
-      const method: HttpMethod = isWebSocket ? 'WS' : isSocketio ? 'SIO' : (selectedEndpoint.method as HttpMethod) || 'GET';
+      const isSse = selectedEndpoint.endpointType === 'sse';
+      const method: HttpMethod = isWebSocket ? 'WS' : isSocketio ? 'SIO' : isSse ? 'SSE' : (selectedEndpoint.method as HttpMethod) || 'GET';
 
       // Generate body example for POST/PUT/PATCH methods
       let body = '';
@@ -420,7 +431,7 @@ function App() {
       }
       paramsFields.push({ key: '', value: '', enabled: true });
 
-      const method: HttpMethod = endpoint.endpointType === 'websocket' ? 'WS' : endpoint.endpointType === 'socketio' ? 'SIO' : (endpoint.method as HttpMethod);
+      const method: HttpMethod = endpoint.endpointType === 'websocket' ? 'WS' : endpoint.endpointType === 'socketio' ? 'SIO' : endpoint.endpointType === 'sse' ? 'SSE' : (endpoint.method as HttpMethod);
 
       // Generate body example for POST/PUT/PATCH methods
       let body = '';
@@ -470,6 +481,11 @@ function App() {
         setSioSocket(null);
         setWsConnected(false);
       }
+      if (sseAbort) {
+        sseAbort.abort();
+        setSseAbort(null);
+        setWsConnected(false);
+      }
 
       // Update URL with path and method/type
       const urlParams = new URLSearchParams();
@@ -478,12 +494,14 @@ function App() {
         urlParams.set('type', 'ws');
       } else if (endpoint.endpointType === 'socketio') {
         urlParams.set('type', 'sio');
+      } else if (endpoint.endpointType === 'sse') {
+        urlParams.set('type', 'sse');
       } else if (endpoint.method) {
         urlParams.set('method', endpoint.method);
       }
       window.history.replaceState(null, '', `?${urlParams.toString()}`);
     },
-    [getFullUrl, categories, findCategoryPath, socket, sioSocket]
+    [getFullUrl, categories, findCategoryPath, socket, sioSocket, sseAbort]
   );
 
   const handleCategorySelect = useCallback((category: CategoryInfo) => {
@@ -596,6 +614,108 @@ function App() {
         };
       } catch (err) {
         setWsMessages(prev => [...prev, { type: 'received', data: 'Error: ' + (err instanceof Error ? err.message : String(err)), time: Date.now() }]);
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (request.method === 'SSE') {
+      if (wsConnected) {
+        sseAbort?.abort();
+        setSseAbort(null);
+        setWsConnected(false);
+        return;
+      }
+
+      setLoading(true);
+      const controller = new AbortController();
+      setSseAbort(controller);
+
+      try {
+        // Build URL with query params
+        const sseUrl = new URL(resolvedUrl, window.location.origin);
+        resolvedParams.forEach((p) => {
+          if (p.enabled && p.key) {
+            sseUrl.searchParams.append(p.key, p.value);
+          }
+        });
+
+        let targetUrl: string;
+        if (corsMode) {
+          targetUrl = `/proxy/${encodeURIComponent(sseUrl.toString())}`;
+        } else {
+          targetUrl = sseUrl.toString();
+        }
+
+        const headers: Record<string, string> = { 'Accept': 'text/event-stream' };
+        configHeaders.forEach((h) => {
+          if (h.enabled && h.name) {
+            headers[h.name] = replaceVariables(h.value, variables);
+          }
+        });
+        resolvedHeaders.forEach((h) => {
+          if (h.enabled && h.key) {
+            headers[h.key] = h.value;
+          }
+        });
+
+        const res = await fetch(targetUrl, { headers, signal: controller.signal });
+        if (!res.ok || !res.body) {
+          setWsMessages(prev => [...prev, { type: 'received', data: `SSE Error: ${res.status} ${res.statusText}`, time: Date.now() }]);
+          setSseAbort(null);
+          setLoading(false);
+          return;
+        }
+
+        setWsConnected(true);
+        setLoading(false);
+        setWsMessages(prev => [...prev, { type: 'received', data: 'Connected to ' + sseUrl.toString(), time: Date.now() }]);
+
+        // Read SSE stream in background
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        (async () => {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const parts = buffer.split(/\n\n/);
+              buffer = parts.pop() || '';
+
+              for (const part of parts) {
+                if (!part.trim()) continue;
+                let eventType = 'message';
+                const dataLines: string[] = [];
+                for (const line of part.split('\n')) {
+                  if (line.startsWith('event:')) {
+                    eventType = line.slice(6).trim();
+                  } else if (line.startsWith('data:')) {
+                    dataLines.push(line.slice(5).trimStart());
+                  }
+                }
+                if (dataLines.length > 0) {
+                  setWsMessages(prev => [...prev, { type: 'received', data: dataLines.join('\n'), time: Date.now(), event: eventType }]);
+                }
+              }
+            }
+            setWsConnected(false);
+            setSseAbort(null);
+            setWsMessages(prev => [...prev, { type: 'received', data: 'Disconnected', time: Date.now() }]);
+          } catch (err) {
+            if (err instanceof Error && err.name === 'AbortError') return;
+            setWsMessages(prev => [...prev, { type: 'received', data: 'SSE Error: ' + (err instanceof Error ? err.message : String(err)), time: Date.now() }]);
+            setWsConnected(false);
+            setSseAbort(null);
+          }
+        })().catch(() => {});
+      } catch (err) {
+        if (!(err instanceof Error && err.name === 'AbortError')) {
+          setWsMessages(prev => [...prev, { type: 'received', data: 'Error: ' + (err instanceof Error ? err.message : String(err)), time: Date.now() }]);
+        }
+        setSseAbort(null);
         setLoading(false);
       }
       return;
@@ -768,11 +888,11 @@ function App() {
   handleSendRef.current = handleSend;
 
   const handleSendRequest = useCallback(() => {
-    handleSendRef.current(false);
+    handleSendRef.current(false).catch(() => {});
   }, []);
 
   const handleMockSendRequest = useCallback(() => {
-    handleSendRef.current(true);
+    handleSendRef.current(true).catch(() => {});
   }, []);
 
   const handleSendEvent = useCallback((eventName: string, data: string) => {
@@ -831,7 +951,7 @@ function App() {
                   onUrlChange={handleUrlChange}
                   onSend={handleSendRequest}
                   onMockSend={mockMode && selectedEndpoint && selectedEndpoint.endpointType === 'http' ? handleMockSendRequest : undefined}
-                  loading={loading || ((request.method === 'WS' || request.method === 'SIO') && !wsConnected && !!(socket || sioSocket))}
+                  loading={loading || ((request.method === 'WS' || request.method === 'SIO' || request.method === 'SSE') && !wsConnected && !!(socket || sioSocket || sseAbort))}
                   wsConnected={wsConnected}
                 />
 
@@ -870,6 +990,7 @@ function App() {
                         onBodyChange={handleBodyChange}
                         requestSchema={selectedEndpoint?.request}
                         wsEvents={selectedEndpoint?.events}
+                        sseEvents={selectedEndpoint?.sseEvents}
                         onSendEvent={handleSendEvent}
                       />
                     </div>
@@ -883,7 +1004,8 @@ function App() {
                       <ResponsePanel
                         response={response}
                         loading={loading}
-                        isWs={request.method === 'WS' || request.method === 'SIO'}
+                        isWs={request.method === 'WS' || request.method === 'SIO' || request.method === 'SSE'}
+                        method={request.method}
                         wsMessages={wsMessages}
                         wsConnected={wsConnected}
                       />
@@ -930,6 +1052,7 @@ function App() {
               requestSchema={selectedEndpoint.request}
               responseSchema={selectedEndpoint.response}
               wsEvents={selectedEndpoint.events}
+              sseEvents={selectedEndpoint.sseEvents}
             />
           </div>
         )}

@@ -14,6 +14,8 @@ pub struct RqcConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub socketio_apis: Vec<WsBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sse_apis: Vec<SseBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub categories: Vec<CategoryBlock>,
 }
 
@@ -44,6 +46,28 @@ pub struct WsEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SseBlock {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<SchemaBlock>,
+    #[serde(default)]
+    pub events: Vec<SseEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SseEvent {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<Field>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CategoryBlock {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -58,6 +82,8 @@ pub struct CategoryBlock {
     pub ws_apis: Vec<WsBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub socketio_apis: Vec<WsBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sse_apis: Vec<SseBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<CategoryBlock>,
 }
@@ -166,6 +192,7 @@ pub enum EndpointType {
     Http,
     Websocket,
     Socketio,
+    Sse,
 }
 
 // Flattened API representation for Web UI
@@ -188,6 +215,8 @@ pub struct ApiEndpoint {
     pub response: Option<SchemaBlock>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub events: Option<Vec<WsEvent>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sse_events: Option<Vec<SseEvent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub auth: Option<SchemaBlock>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -242,6 +271,7 @@ impl RqcConfig {
                     request: method.request.clone(),
                     response: method.response.clone(),
                     events: None,
+                    sse_events: None,
                     auth: None,
                     connect_headers: None,
                     category_id: None,
@@ -264,6 +294,7 @@ impl RqcConfig {
                 request: None,
                 response: None,
                 events: Some(ws.events.clone()),
+                sse_events: None,
                 auth: None,
                 connect_headers: None,
                 category_id: None,
@@ -285,8 +316,35 @@ impl RqcConfig {
                 request: None,
                 response: None,
                 events: Some(sio.events.clone()),
+                sse_events: None,
                 auth: sio.auth.clone(),
                 connect_headers: sio.connect_headers.clone(),
+                category_id: None,
+                category_name: None,
+            });
+        }
+
+        // Process top-level SSE APIs
+        for sse in &self.sse_apis {
+            id_counter += 1;
+            let full_url = base_url
+                .as_ref()
+                .map(|base| format!("{}{}", base.trim_end_matches('/'), &sse.path));
+
+            endpoints.push(ApiEndpoint {
+                id: format!("sse-{}", id_counter),
+                endpoint_type: EndpointType::Sse,
+                path: sse.path.clone(),
+                full_url,
+                method: Some("SSE".to_string()),
+                name: sse.name.clone(),
+                description: sse.description.clone(),
+                request: sse.request.clone(),
+                response: None,
+                events: None,
+                sse_events: Some(sse.events.clone()),
+                auth: None,
+                connect_headers: None,
                 category_id: None,
                 category_name: None,
             });
@@ -326,6 +384,7 @@ impl RqcConfig {
                         request: method.request.clone(),
                         response: method.response.clone(),
                         events: None,
+                        sse_events: None,
                         auth: None,
                         connect_headers: None,
                         category_id: Some(category.id.clone()),
@@ -348,6 +407,7 @@ impl RqcConfig {
                     request: None,
                     response: None,
                     events: Some(ws.events.clone()),
+                    sse_events: None,
                     auth: None,
                     connect_headers: None,
                     category_id: Some(category.id.clone()),
@@ -369,8 +429,36 @@ impl RqcConfig {
                     request: None,
                     response: None,
                     events: Some(sio.events.clone()),
+                    sse_events: None,
                     auth: sio.auth.clone(),
                     connect_headers: sio.connect_headers.clone(),
+                    category_id: Some(category.id.clone()),
+                    category_name: category.name.clone(),
+                });
+            }
+
+            // Process SSE APIs in this category
+            for sse in &category.sse_apis {
+                *id_counter += 1;
+                let full_path = format!("{}{}", current_prefix, sse.path);
+                let full_url = base_url
+                    .as_ref()
+                    .map(|base| format!("{}{}", base.trim_end_matches('/'), &full_path));
+
+                endpoints.push(ApiEndpoint {
+                    id: format!("sse-{}", id_counter),
+                    endpoint_type: EndpointType::Sse,
+                    path: full_path,
+                    full_url,
+                    method: Some("SSE".to_string()),
+                    name: sse.name.clone(),
+                    description: sse.description.clone(),
+                    request: sse.request.clone(),
+                    response: None,
+                    events: None,
+                    sse_events: Some(sse.events.clone()),
+                    auth: None,
+                    connect_headers: None,
                     category_id: Some(category.id.clone()),
                     category_name: category.name.clone(),
                 });
@@ -397,6 +485,7 @@ impl RqcConfig {
             }
             endpoint_count += category.ws_apis.len();
             endpoint_count += category.socketio_apis.len();
+            endpoint_count += category.sse_apis.len();
 
             CategoryInfo {
                 id: category.id.clone(),

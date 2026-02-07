@@ -153,5 +153,24 @@
       "}"
     ],
     "description": "SocketIO endpoint"
+  },
+  "SSE": {
+    "prefix": "sse",
+    "body": [
+      "sse ${1:/events/stream} {",
+      "\tname \"${2:Event Stream}\"",
+      "",
+      "\trequest {",
+      "\t\t$3",
+      "\t}",
+      "",
+      "\tresponse {",
+      "\t\tevent ${4:eventName} {",
+      "\t\t\t$0",
+      "\t\t}",
+      "\t}",
+      "}"
+    ],
+    "description": "SSE (Server-Sent Events) endpoint"
   }
 }

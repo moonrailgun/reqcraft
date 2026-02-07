@@ -241,6 +241,7 @@ fn convert_to_rqc(spec: OpenApiSpec) -> Result<RqcConfig, Box<dyn std::error::Er
             apis,
             ws_apis: Vec::new(),
             socketio_apis: Vec::new(),
+            sse_apis: Vec::new(),
             children: Vec::new(),
         })
         .collect();
@@ -257,6 +258,7 @@ fn convert_to_rqc(spec: OpenApiSpec) -> Result<RqcConfig, Box<dyn std::error::Er
         apis: untagged_apis,
         ws_apis: Vec::new(),
         socketio_apis: Vec::new(),
+        sse_apis: Vec::new(),
         children,
     });
 

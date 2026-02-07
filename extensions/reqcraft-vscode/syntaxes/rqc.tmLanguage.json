@@ -10,6 +10,7 @@
     { "include": "#api" },
     { "include": "#websocket" },
     { "include": "#socketio" },
+    { "include": "#sse" },
     { "include": "#annotations" },
     { "include": "#types" },
     { "include": "#strings" },
@@ -102,6 +103,7 @@
         { "include": "#api" },
         { "include": "#websocket" },
         { "include": "#socketio" },
+        { "include": "#sse" },
         { "include": "#strings" },
         { "include": "#comments" }
       ]
@@ -141,6 +143,30 @@
         { "include": "#sio-auth-headers" },
         { "include": "#ws-event" },
         { "include": "#properties" },
+        { "include": "#comments" }
+      ]
+    },
+    "sse": {
+      "begin": "\\b(sse)\\s+(/[^\\s{]*)\\s*\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.rqc" },
+        "2": { "name": "string.unquoted.path.rqc" }
+      },
+      "patterns": [
+        { "include": "#properties" },
+        { "include": "#sse-request-response" },
+        { "include": "#comments" }
+      ]
+    },
+    "sse-request-response": {
+      "begin": "\\b(request|response)\\s*\\{",
+      "end": "\\}",
+      "beginCaptures": { "1": { "name": "keyword.other.block.rqc" } },
+      "patterns": [
+        { "include": "#ws-event" },
+        { "include": "#fields" },
+        { "include": "#annotations" },
         { "include": "#comments" }
       ]
     },

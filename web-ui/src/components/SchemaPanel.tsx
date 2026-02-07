@@ -15,12 +15,13 @@ import {
   IconSchema,
   IconMessage,
 } from '@tabler/icons-react';
-import type { SchemaBlock, Field, WsEvent } from '../App';
+import type { SchemaBlock, Field, WsEvent, SseEvent } from '../App';
 
 interface SchemaPanelProps {
   requestSchema?: SchemaBlock;
   responseSchema?: SchemaBlock;
   wsEvents?: WsEvent[];
+  sseEvents?: SseEvent[];
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -236,17 +237,61 @@ const WsEventSchemaView = memo(function WsEventSchemaView({
   );
 });
 
+const SseEventSchemaView = memo(function SseEventSchemaView({
+  events,
+  requestSchema,
+}: {
+  events: SseEvent[];
+  requestSchema?: SchemaBlock;
+}) {
+  const [activeEvent, setActiveEvent] = useState<string | null>(
+    events.length > 0 ? events[0].name : null
+  );
+
+  const selectedEvent = events.find((e) => e.name === activeEvent);
+
+  return (
+    <Box>
+      {requestSchema && requestSchema.fields.length > 0 && (
+        <SchemaBlockView title="Request" schema={requestSchema} color="blue" />
+      )}
+
+      <Tabs value={activeEvent} onChange={setActiveEvent}>
+        <Tabs.List className="bg-bg-secondary border-b border-border px-2">
+          {events.map((event) => (
+            <Tabs.Tab key={event.name} value={event.name} leftSection={<IconMessage size={14} />}>
+              {event.name}
+            </Tabs.Tab>
+          ))}
+        </Tabs.List>
+
+        {selectedEvent && (selectedEvent.fields ?? []).length > 0 && (
+          <Box>
+            <SchemaBlockView
+              title="Event Data"
+              schema={{ fields: selectedEvent.fields ?? [], optional: false }}
+              color="orange"
+            />
+          </Box>
+        )}
+      </Tabs>
+    </Box>
+  );
+});
+
 export const SchemaPanel = memo(function SchemaPanel({
   requestSchema,
   responseSchema,
   wsEvents,
+  sseEvents,
 }: SchemaPanelProps) {
   const hasAnySchema =
     (requestSchema && requestSchema.fields.length > 0) ||
     (responseSchema && responseSchema.fields.length > 0);
   const hasWsEvents = wsEvents && wsEvents.length > 0;
+  const hasSseEvents = sseEvents && sseEvents.length > 0;
 
-  if (!hasAnySchema && !hasWsEvents) {
+  if (!hasAnySchema && !hasWsEvents && !hasSseEvents) {
     return (
       <Box className="h-full flex items-center justify-center bg-bg-primary">
         <Stack align="center" gap="xs">
@@ -255,6 +300,14 @@ export const SchemaPanel = memo(function SchemaPanel({
             No schema defined for this endpoint
           </Text>
         </Stack>
+      </Box>
+    );
+  }
+
+  if (hasSseEvents) {
+    return (
+      <Box className="flex-1 overflow-auto bg-bg-primary">
+        <SseEventSchemaView events={sseEvents!} requestSchema={requestSchema} />
       </Box>
     );
   }

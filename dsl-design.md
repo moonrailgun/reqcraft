@@ -368,22 +368,36 @@ socketio http://localhost:3000/ {
 
 ### SSE 支持
 
-同时支持 sse 事件，格式参考
+SSE（Server-Sent Events）本质是一个保持打开的 HTTP GET 请求，服务端通过 `Content-Type: text/event-stream` 持续推送事件。因此 DSL 遵循 HTTP 的 request/response 模型：
+
+- **路径格式**：使用相对路径（如 `/events/stream`），与 `api` 块一致，由 baseUrl 自动拼接
+- **request**：描述建立 SSE 连接时的 HTTP 请求参数（query params 等）
+- **response**：内嵌 `event` 块，描述服务端推送的各种事件及数据结构
 
 ```
-sse http://localhost:3000/ {
-  event foo {
-    request {
-      foo String
-      bar Number
-    }
-    
-    response {
-      foo String
-      bar Number
-    }
+sse /events/stream {
+  name "Event Stream"
+
+  request {
+    userId String @params @example("123")
+    filter String @params
   }
-  
-  event bar { }
+
+  response {
+    event foo {
+      data String
+      id Number
+    }
+
+    event bar { }
+  }
 }
 ```
+
+设计要点：
+
+- `sse /events/stream` 用相对路径，baseUrl 自动拼接（和 `api` 一致）
+- `request` 描述建立连接的 HTTP 参数（`@params` 标记为 query string）
+- `response` 包裹 `event` 块，语义清晰：response 就是服务端推过来的东西
+- 每个 `event` 内直接写字段（不需要再嵌套 response），描述该事件的数据结构
+- 支持 `name` 属性

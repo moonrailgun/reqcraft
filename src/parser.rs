@@ -65,6 +65,9 @@ impl Parser {
                 "socketio" => {
                     config.socketio_apis.push(self.parse_ws_block()?);
                 }
+                "sse" => {
+                    config.sse_apis.push(self.parse_sse_block()?);
+                }
                 "import" => {
                     config.imports.push(self.parse_import()?);
                 }
@@ -350,6 +353,93 @@ impl Parser {
         Ok(event)
     }
 
+    fn parse_sse_block(&mut self) -> Result<SseBlock, ParseError> {
+        self.next_token(); // skip 'sse'
+
+        let path = self.current_token.literal.clone();
+        self.next_token();
+
+        self.expect(lexer::TokenType::LBrace)?;
+
+        let mut sse = SseBlock {
+            path,
+            name: None,
+            description: None,
+            request: None,
+            events: Vec::new(),
+        };
+
+        let mut pending_doc_comment: Option<String> = None;
+
+        while self.current_token.token_type != lexer::TokenType::RBrace {
+            if self.current_token.token_type == lexer::TokenType::DocComment {
+                pending_doc_comment = Some(self.current_token.literal.clone());
+                self.next_token();
+                continue;
+            }
+
+            match self.current_token.literal.as_str() {
+                "name" => {
+                    self.next_token();
+                    if self.current_token.token_type == lexer::TokenType::String {
+                        sse.name = Some(self.current_token.literal.clone());
+                        self.next_token();
+                    }
+                }
+                "request" => {
+                    self.next_token();
+                    sse.request = Some(self.parse_schema_block()?);
+                }
+                "response" => {
+                    self.next_token();
+                    self.expect(lexer::TokenType::LBrace)?;
+                    while self.current_token.token_type != lexer::TokenType::RBrace {
+                        if self.current_token.literal == "event" {
+                            sse.events.push(self.parse_sse_event()?);
+                        } else {
+                            self.next_token();
+                        }
+                    }
+                    self.expect(lexer::TokenType::RBrace)?;
+                }
+                _ => {
+                    self.next_token();
+                }
+            }
+        }
+
+        self.expect(lexer::TokenType::RBrace)?;
+
+        if sse.description.is_none() {
+            sse.description = pending_doc_comment;
+        }
+
+        Ok(sse)
+    }
+
+    fn parse_sse_event(&mut self) -> Result<SseEvent, ParseError> {
+        self.next_token(); // skip 'event'
+
+        let name = self.current_token.literal.clone();
+        self.next_token();
+
+        self.expect(lexer::TokenType::LBrace)?;
+
+        let mut fields = Vec::new();
+
+        while self.current_token.token_type != lexer::TokenType::RBrace {
+            if self.current_token.token_type == lexer::TokenType::Ident {
+                fields.push(self.parse_field()?);
+            } else {
+                self.next_token();
+            }
+        }
+
+        self.expect(lexer::TokenType::RBrace)?;
+
+        Ok(SseEvent { name, fields })
+    }
+
     fn parse_method_block(&mut self) -> Result<MethodBlock, ParseError> {
         let method = self.current_token.literal.to_uppercase();
         self.next_token();
@@ -551,6 +641,7 @@ impl Parser {
             apis: Vec::new(),
             ws_apis: Vec::new(),
             socketio_apis: Vec::new(),
+            sse_apis: Vec::new(),
             children: Vec::new(),
         };
 
@@ -589,6 +680,9 @@ impl Parser {
                 }
                 "socketio" => {
                     category.socketio_apis.push(self.parse_ws_block()?);
+                }
+                "sse" => {
+                    category.sse_apis.push(self.parse_sse_block()?);
                 }
                 "category" => {
                     category.children.push(self.parse_category_block(counter)?);

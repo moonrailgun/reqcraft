@@ -52,7 +52,7 @@ pub async fn start_server(
     reload_tx: tokio::sync::broadcast::Sender<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let http_client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10))
         .build()?;
 
     let state = AppState {
@@ -357,21 +357,9 @@ async fn cors_proxy_handler(
                 }
             }
 
-            // Get the response body
-            match response.bytes().await {
-                Ok(bytes) => (status, response_headers, bytes.to_vec()).into_response(),
-                Err(e) => {
-                    warn!("Failed to read response body: {}", e);
-                    (
-                        StatusCode::BAD_GATEWAY,
-                        Json(json!({
-                            "error": "Failed to read response body",
-                            "details": e.to_string()
-                        })),
-                    )
-                        .into_response()
-                }
-            }
+            // Stream the response body directly (supports SSE and large responses)
+            let body = Body::from_stream(response.bytes_stream());
+            (status, response_headers, body).into_response()
         }
         Err(e) => {
             warn!("Proxy request failed: {}", e);

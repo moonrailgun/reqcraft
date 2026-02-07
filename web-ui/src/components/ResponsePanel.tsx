@@ -21,6 +21,7 @@ interface ResponsePanelProps {
   isWs?: boolean;
   wsMessages?: { type: 'sent' | 'received', data: string, time: number, event?: string }[];
   wsConnected?: boolean;
+  method?: string;
 }
 
 const getStatusColor = (status: number) => {
@@ -84,7 +85,7 @@ const EDITOR_OPTIONS = {
 const PANEL_STYLE = { flex: 1, minHeight: 0, overflow: 'hidden' };
 const PANEL_HEADERS_STYLE = { flex: 1, minHeight: 0, overflow: 'auto' };
 
-export const ResponsePanel = memo(function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected }: ResponsePanelProps) {
+export const ResponsePanel = memo(function ResponsePanel({ response, loading, isWs, wsMessages, wsConnected, method }: ResponsePanelProps) {
   const { language, formattedBody } = useMemo(() => {
     if (!response) return { language: 'plaintext', formattedBody: '' };
     const lang = getLanguageFromContentType(response.headers);
@@ -110,7 +111,7 @@ export const ResponsePanel = memo(function ResponsePanel({ response, loading, is
       <Box className="flex flex-col h-full">
         <Box className="flex items-center justify-between border-b border-border bg-bg-secondary px-4 h-[41px]">
           <Group gap="md">
-            <Text size="sm" fw={600}>WebSocket Messages</Text>
+            <Text size="sm" fw={600}>{method === 'SSE' ? 'SSE Messages' : method === 'SIO' ? 'Socket.IO Messages' : 'WebSocket Messages'}</Text>
             {wsMessages && wsMessages.length > 0 && (
               <Badge size="xs" variant="light" color="gray">
                 {wsMessages.length}

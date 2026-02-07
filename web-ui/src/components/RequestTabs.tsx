@@ -21,7 +21,7 @@ import {
   IconChevronRight,
 } from '@tabler/icons-react';
 import Editor from '@monaco-editor/react';
-import type { KeyValue, SchemaBlock, WsEvent } from '../App';
+import type { KeyValue, SchemaBlock, WsEvent, SseEvent } from '../App';
 import { generateExampleFromSchema, hasBodyFields } from '../utils/schema';
 
 interface RequestTabsProps {
@@ -34,6 +34,7 @@ interface RequestTabsProps {
   onBodyChange: (body: string) => void;
   requestSchema?: SchemaBlock;
   wsEvents?: WsEvent[];
+  sseEvents?: SseEvent[];
   onSendEvent?: (eventName: string, data: string) => void;
 }
 
@@ -235,21 +236,27 @@ export const RequestTabs = memo(function RequestTabs({
   onBodyChange,
   requestSchema,
   wsEvents,
+  sseEvents,
   onSendEvent,
 }: RequestTabsProps) {
   const methodUpper = method?.toUpperCase() || '';
   const showBodyTab = METHODS_WITH_BODY.includes(methodUpper);
   const isWs = methodUpper === 'WS' || methodUpper === 'SIO';
+  const isSse = methodUpper === 'SSE';
   const isSio = methodUpper === 'SIO';
 
   // WebSocket event editing state
   const [selectedWsEvent, setSelectedWsEvent] = useState<WsEvent | null>(null);
   const [wsEventData, setWsEventData] = useState<string>('');
+  // SSE event detail state
+  const [selectedSseEvent, setSelectedSseEvent] = useState<SseEvent | null>(null);
 
   // Get available tabs based on current state
   const availableTabs = useMemo(() => {
     const tabs: string[] = [];
-    if (!isWs) {
+    if (isSse) {
+      tabs.push('params', 'headers', 'events');
+    } else if (!isWs) {
       tabs.push('params', 'headers');
       if (showBodyTab) tabs.push('body');
     } else {
@@ -259,9 +266,10 @@ export const RequestTabs = memo(function RequestTabs({
       tabs.push('events');
     }
     return tabs;
-  }, [isWs, isSio, showBodyTab]);
+  }, [isWs, isSse, isSio, showBodyTab]);
 
   const getDefaultTab = () => {
+    if (isSse) return 'params';
     if (isWs) return 'events';
     if (showBodyTab) return 'body';
     return 'params';
@@ -277,6 +285,7 @@ export const RequestTabs = memo(function RequestTabs({
     setActiveTab(getDefaultTab());
     setSelectedWsEvent(null);
     setWsEventData('');
+    setSelectedSseEvent(null);
   }
 
   // Adjust state during render when wsEvents change
@@ -284,6 +293,7 @@ export const RequestTabs = memo(function RequestTabs({
     setPrevWsEvents(wsEvents);
     setSelectedWsEvent(null);
     setWsEventData('');
+    setSelectedSseEvent(null);
   }
 
   // Ensure activeTab is valid
@@ -327,7 +337,7 @@ export const RequestTabs = memo(function RequestTabs({
       styles={TABS_STYLES}
     >
       <Tabs.List className="bg-bg-secondary border-b border-border">
-        {!isWs && (
+        {(!isWs || isSse) && !isSio && (
           <>
             <Tabs.Tab value="params">
               Params
@@ -378,9 +388,19 @@ export const RequestTabs = memo(function RequestTabs({
             )}
           </Tabs.Tab>
         )}
+        {isSse && (
+          <Tabs.Tab value="events">
+            Events
+            {sseEvents && sseEvents.length > 0 && (
+              <Badge size="xs" color="orange" ml={6}>
+                {sseEvents.length}
+              </Badge>
+            )}
+          </Tabs.Tab>
+        )}
       </Tabs.List>
 
-      {!isWs && (
+      {(!isWs || isSse) && !isSio && (
         <>
           <Tabs.Panel value="params" className="overflow-auto bg-bg-primary">
             <KeyValueTable items={params} onChange={onParamsChange} />
@@ -517,6 +537,110 @@ export const RequestTabs = memo(function RequestTabs({
                   </Table.Tr>
                 ))}
                 {(!wsEvents || wsEvents.length === 0) && (
+                  <Table.Tr>
+                    <Table.Td colSpan={3} className="text-center py-8">
+                      <Text size="sm" c="dimmed">No events defined</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+          )}
+        </Tabs.Panel>
+      )}
+
+      {isSse && (
+        <Tabs.Panel value="events" className="overflow-auto bg-bg-primary">
+          {selectedSseEvent ? (
+            <Box className="flex flex-col h-full">
+              <Box className="flex items-center px-4 py-2 bg-bg-secondary border-b border-border">
+                <Group gap="sm">
+                  <ActionIcon
+                    variant="subtle"
+                    color="gray"
+                    size="sm"
+                    onClick={() => setSelectedSseEvent(null)}
+                  >
+                    <IconArrowLeft size={16} />
+                  </ActionIcon>
+                  <IconMessage size={14} color="var(--color-accent-orange)" />
+                  <Text size="sm" fw={600}>{selectedSseEvent.name}</Text>
+                  <Badge size="xs" variant="outline" color="orange">
+                    {(selectedSseEvent.fields ?? []).length} fields
+                  </Badge>
+                </Group>
+              </Box>
+              <Table className="w-full">
+                <Table.Thead>
+                  <Table.Tr className="border-b border-border">
+                    <Table.Th className="text-text-secondary font-medium px-4">Field</Table.Th>
+                    <Table.Th className="text-text-secondary font-medium">Type</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {(selectedSseEvent.fields ?? []).map((field) => (
+                    <Table.Tr key={field.name} className="border-b border-border">
+                      <Table.Td className="px-4">
+                        <Text size="sm" fw={500}>{field.name}</Text>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge size="xs" variant="light" color="gray">{field.fieldType}</Badge>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))}
+                  {(selectedSseEvent.fields ?? []).length === 0 && (
+                    <Table.Tr>
+                      <Table.Td colSpan={2} className="text-center py-8">
+                        <Text size="sm" c="dimmed">No fields defined</Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  )}
+                </Table.Tbody>
+              </Table>
+            </Box>
+          ) : (
+            <Table className="w-full">
+              <Table.Thead>
+                <Table.Tr className="border-b border-border">
+                  <Table.Th className="text-text-secondary font-medium px-4">Event Name</Table.Th>
+                  <Table.Th className="text-text-secondary font-medium">Fields</Table.Th>
+                  <Table.Th w={40} />
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {sseEvents?.map((event) => (
+                  <Table.Tr
+                    key={event.name}
+                    className="border-b border-border hover:bg-bg-hover cursor-pointer"
+                    onClick={() => setSelectedSseEvent(event)}
+                  >
+                    <Table.Td className="px-4">
+                      <Group gap="xs">
+                        <IconMessage size={14} color="var(--color-accent-orange)" />
+                        <Text size="sm" fw={500}>{event.name}</Text>
+                      </Group>
+                    </Table.Td>
+                    <Table.Td>
+                      <Badge size="xs" variant="outline" color="orange">
+                        {(event.fields ?? []).length} fields
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSseEvent(event);
+                        }}
+                      >
+                        <IconChevronRight size={14} />
+                      </ActionIcon>
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+                {(!sseEvents || sseEvents.length === 0) && (
                   <Table.Tr>
                     <Table.Td colSpan={3} className="text-center py-8">
                       <Text size="sm" c="dimmed">No events defined</Text>

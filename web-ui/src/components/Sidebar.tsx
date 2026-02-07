@@ -19,6 +19,7 @@ import {
   IconApi,
   IconVariable,
   IconPlugConnected,
+  IconBroadcast,
 } from '@tabler/icons-react';
 import type { ApiEndpoint, CategoryInfo } from '../App';
 import type { Variable } from '../utils/variables';
@@ -51,6 +52,7 @@ const methodStyles: Record<string, { bg: string; text: string }> = {
   PATCH: { bg: 'rgba(20, 184, 166, 0.15)', text: '#2dd4bf' },
   WS: { bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa' },
   SIO: { bg: 'rgba(132, 204, 22, 0.15)', text: '#a3e635' },
+  SSE: { bg: 'rgba(251, 146, 60, 0.15)', text: '#fb923c' },
 };
 
 interface TreeItemProps {
@@ -252,7 +254,7 @@ function EndpointItem({
   level = 0,
 }: EndpointItemProps) {
   const isSelected = selectedId === endpoint.id;
-  const displayMethod = endpoint.endpointType === 'websocket' ? 'WS' : endpoint.endpointType === 'socketio' ? 'SIO' : (endpoint.method || 'GET');
+  const displayMethod = endpoint.endpointType === 'websocket' ? 'WS' : endpoint.endpointType === 'socketio' ? 'SIO' : endpoint.endpointType === 'sse' ? 'SSE' : (endpoint.method || 'GET');
   const methodStyle = methodStyles[displayMethod] || {
     bg: 'rgba(156, 163, 175, 0.15)',
     text: '#9ca3af',
@@ -644,6 +646,207 @@ function SocketIOGroup({
   );
 }
 
+interface SSEGroupProps {
+  endpoints: ApiEndpoint[];
+  selectedId?: string;
+  onSelect: (endpoint: ApiEndpoint) => void;
+}
+
+function SSEGroup({
+  endpoints,
+  selectedId,
+  onSelect,
+}: SSEGroupProps) {
+  const [opened, setOpened] = useState(true);
+
+  if (endpoints.length === 0) return null;
+
+  return (
+    <Box>
+      <UnstyledButton
+        onClick={() => setOpened((o) => !o)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          padding: '8px 12px',
+          borderRadius: 6,
+          transition: 'all 0.15s ease',
+        }}
+        className="hover:bg-[rgba(255,255,255,0.05)]"
+      >
+        <Box
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 20,
+            height: 20,
+            borderRadius: 4,
+          }}
+        >
+          <IconChevronRight
+            size={14}
+            style={{
+              transform: opened ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+              color: 'rgba(255, 255, 255, 0.5)',
+            }}
+          />
+        </Box>
+        <IconBroadcast size={18} style={{ color: '#fb923c', flexShrink: 0 }} />
+        <Text
+          size="sm"
+          fw={500}
+          style={{ flex: 1, color: 'rgba(255, 255, 255, 0.7)' }}
+        >
+          SSE
+        </Text>
+        <Badge
+          size="xs"
+          variant="light"
+          style={{
+            backgroundColor: 'rgba(251, 146, 60, 0.15)',
+            color: '#fb923c',
+            border: 'none',
+          }}
+        >
+          {endpoints.length}
+        </Badge>
+      </UnstyledButton>
+
+      <Collapse in={opened}>
+        <Stack gap={2} style={{ marginTop: 2 }}>
+          {endpoints.map((ep) => (
+            <SSEItem
+              key={ep.id}
+              endpoint={ep}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              level={1}
+            />
+          ))}
+        </Stack>
+      </Collapse>
+    </Box>
+  );
+}
+
+interface SSEItemProps {
+  endpoint: ApiEndpoint;
+  selectedId?: string;
+  onSelect: (endpoint: ApiEndpoint) => void;
+  level?: number;
+}
+
+function SSEItem({
+  endpoint,
+  selectedId,
+  onSelect,
+  level = 0,
+}: SSEItemProps) {
+  const isSelected = selectedId === endpoint.id;
+  const methodStyle = methodStyles['SSE'];
+
+  return (
+    <TreeItem level={level}>
+      <Tooltip
+        label={endpoint.description}
+        disabled={!endpoint.description}
+        position="right"
+        withArrow
+        multiline
+        w={280}
+      >
+        <UnstyledButton
+          onClick={() => onSelect(endpoint)}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            width: '100%',
+            padding: '6px 12px',
+            borderRadius: 6,
+            backgroundColor: isSelected
+              ? 'rgba(251, 146, 60, 0.15)'
+              : 'transparent',
+            transition: 'all 0.15s ease',
+          }}
+          className="hover:bg-[rgba(255,255,255,0.05)]"
+        >
+          <Group gap={8} wrap="nowrap" style={{ width: '100%' }}>
+            <IconBroadcast
+              size={14}
+              style={{
+                color: isSelected ? '#fb923c' : 'rgba(255, 255, 255, 0.4)',
+                flexShrink: 0,
+              }}
+            />
+            <Box
+              style={{
+                padding: '2px 6px',
+                borderRadius: 4,
+                backgroundColor: methodStyle.bg,
+                flexShrink: 0,
+              }}
+            >
+              <Text
+                size="xs"
+                fw={600}
+                style={{
+                  color: methodStyle.text,
+                  fontFamily: 'var(--mantine-font-family-monospace)',
+                  fontSize: 10,
+                }}
+              >
+                SSE
+              </Text>
+            </Box>
+            <Text
+              size="xs"
+              style={{
+                color: isSelected ? '#fff' : 'rgba(255, 255, 255, 0.7)',
+                fontFamily: 'var(--mantine-font-family-monospace)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {endpoint.path}
+            </Text>
+          </Group>
+          {endpoint.name && (
+            <Text
+              size="xs"
+              style={{
+                color: isSelected ? 'rgba(255,255,255,0.8)' : 'rgba(255, 255, 255, 0.45)',
+                marginLeft: 22,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {endpoint.name}
+            </Text>
+          )}
+          {endpoint.sseEvents && endpoint.sseEvents.length > 0 && (
+            <Text
+              size="xs"
+              style={{
+                color: 'rgba(251, 146, 60, 0.6)',
+                marginLeft: 22,
+              }}
+            >
+              {endpoint.sseEvents.length} event{endpoint.sseEvents.length > 1 ? 's' : ''}
+            </Text>
+          )}
+        </UnstyledButton>
+      </Tooltip>
+    </TreeItem>
+  );
+}
+
 interface UncategorizedGroupProps {
   endpoints: ApiEndpoint[];
   selectedId?: string;
@@ -657,9 +860,9 @@ function UncategorizedGroup({
 }: UncategorizedGroupProps) {
   const [opened, setOpened] = useState(true);
 
-  // Filter out WebSocket and SocketIO endpoints - they are shown in their own groups
+  // Filter out WebSocket, SocketIO, and SSE endpoints - they are shown in their own groups
   const httpEndpoints = useMemo(
-    () => endpoints.filter((ep) => ep.endpointType !== 'websocket' && ep.endpointType !== 'socketio'),
+    () => endpoints.filter((ep) => ep.endpointType !== 'websocket' && ep.endpointType !== 'socketio' && ep.endpointType !== 'sse'),
     [endpoints]
   );
 
@@ -784,6 +987,11 @@ export const Sidebar = memo(function Sidebar({
 
   const uncategorizedSioEndpoints = useMemo(
     () => uncategorizedEndpoints.filter((ep) => ep.endpointType === 'socketio'),
+    [uncategorizedEndpoints]
+  );
+
+  const uncategorizedSseEndpoints = useMemo(
+    () => uncategorizedEndpoints.filter((ep) => ep.endpointType === 'sse'),
     [uncategorizedEndpoints]
   );
 
@@ -987,6 +1195,13 @@ export const Sidebar = memo(function Sidebar({
             {/* SocketIO endpoints */}
             <SocketIOGroup
               endpoints={uncategorizedSioEndpoints}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+
+            {/* SSE endpoints */}
+            <SSEGroup
+              endpoints={uncategorizedSseEndpoints}
               selectedId={selectedId}
               onSelect={onSelect}
             />
