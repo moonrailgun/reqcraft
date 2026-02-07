@@ -240,6 +240,7 @@ export const RequestTabs = memo(function RequestTabs({
   const methodUpper = method?.toUpperCase() || '';
   const showBodyTab = METHODS_WITH_BODY.includes(methodUpper);
   const isWs = methodUpper === 'WS' || methodUpper === 'SIO';
+  const isSio = methodUpper === 'SIO';
 
   // WebSocket event editing state
   const [selectedWsEvent, setSelectedWsEvent] = useState<WsEvent | null>(null);
@@ -252,10 +253,13 @@ export const RequestTabs = memo(function RequestTabs({
       tabs.push('params', 'headers');
       if (showBodyTab) tabs.push('body');
     } else {
+      if (isSio) {
+        tabs.push('auth', 'headers');
+      }
       tabs.push('events');
     }
     return tabs;
-  }, [isWs, showBodyTab]);
+  }, [isWs, isSio, showBodyTab]);
 
   const getDefaultTab = () => {
     if (isWs) return 'events';
@@ -344,6 +348,26 @@ export const RequestTabs = memo(function RequestTabs({
           </>
         )}
         {showBodyTab && <Tabs.Tab value="body">Body</Tabs.Tab>}
+        {isSio && (
+          <>
+            <Tabs.Tab value="auth">
+              Auth
+              {getActiveCount(params) > 0 && (
+                <Badge size="xs" color="lime" ml={6}>
+                  {getActiveCount(params)}
+                </Badge>
+              )}
+            </Tabs.Tab>
+            <Tabs.Tab value="headers">
+              Headers
+              {getActiveCount(headers) > 0 && (
+                <Badge size="xs" color="lime" ml={6}>
+                  {getActiveCount(headers)}
+                </Badge>
+              )}
+            </Tabs.Tab>
+          </>
+        )}
         {isWs && (
           <Tabs.Tab value="events">
             Events
@@ -394,6 +418,17 @@ export const RequestTabs = memo(function RequestTabs({
             />
           </Box>
         </Tabs.Panel>
+      )}
+
+      {isSio && (
+        <>
+          <Tabs.Panel value="auth" className="overflow-auto bg-bg-primary">
+            <KeyValueTable items={params} onChange={onParamsChange} />
+          </Tabs.Panel>
+          <Tabs.Panel value="headers" className="overflow-auto bg-bg-primary">
+            <KeyValueTable items={headers} onChange={onHeadersChange} />
+          </Tabs.Panel>
+        </>
       )}
 
       {isWs && (

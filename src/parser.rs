@@ -264,6 +264,8 @@ impl Parser {
             events: Vec::new(),
             name: None,
             description: None,
+            auth: None,
+            connect_headers: None,
         };
 
         let mut pending_doc_comment: Option<String> = None;
@@ -284,10 +286,16 @@ impl Parser {
                         self.next_token();
                     }
                 }
+                "auth" => {
+                    self.next_token();
+                    ws.auth = Some(self.parse_schema_block()?);
+                }
+                "headers" => {
+                    self.next_token();
+                    ws.connect_headers = Some(self.parse_schema_block()?);
+                }
                 "event" => {
                     let event = self.parse_ws_event()?;
-                    // Assign pending doc comment to event description if we add description to event
-                    // For now, events don't have description in AST, so we just clear it or handle it if needed
                     pending_doc_comment = None;
                     ws.events.push(event);
                 }

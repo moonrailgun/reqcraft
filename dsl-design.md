@@ -339,6 +339,39 @@ ws https://echo.websocket.org/ {
 
 ```
 socketio http://localhost:3000/ {
+  auth {
+    token String @example("my-token")
+  }
+
+  headers {
+    Authorization String @example("Bearer xxx")
+  }
+
+  event foo {
+    request {
+      foo String
+      bar Number
+    }
+    
+    response {
+      foo String
+      bar Number
+    }
+  }
+  
+  event bar { }
+}
+```
+
+其中 `auth` 和 `headers` 块是可选的，用于在建立 SocketIO 连接时传入认证信息和自定义请求头。连接建立后这些参数不可修改。
+
+
+### SSE 支持
+
+同时支持 sse 事件，格式参考
+
+```
+sse http://localhost:3000/ {
   event foo {
     request {
       foo String

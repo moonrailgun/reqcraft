@@ -72,6 +72,8 @@ export interface ApiEndpoint {
   request?: SchemaBlock;
   response?: SchemaBlock;
   events?: WsEvent[];
+  auth?: SchemaBlock;
+  connectHeaders?: SchemaBlock;
   categoryId?: string;
   categoryName?: string;
 }
@@ -360,11 +362,33 @@ function App() {
         body = JSON.stringify(exampleData, null, 2);
       }
 
+      // For SIO endpoints, populate auth fields as params and connectHeaders as headers
+      let initParams = paramsFields;
+      let initHeaders: KeyValue[] = [{ key: '', value: '', enabled: true }];
+      if (isSocketio) {
+        if (selectedEndpoint.auth?.fields) {
+          initParams = [];
+          selectedEndpoint.auth.fields.forEach((field) => {
+            const value = field.example !== undefined ? String(field.example) : '';
+            initParams.push({ key: field.name, value, enabled: true });
+          });
+          initParams.push({ key: '', value: '', enabled: true });
+        }
+        if (selectedEndpoint.connectHeaders?.fields) {
+          initHeaders = [];
+          selectedEndpoint.connectHeaders.fields.forEach((field) => {
+            const value = field.example !== undefined ? String(field.example) : '';
+            initHeaders.push({ key: field.name, value, enabled: true });
+          });
+          initHeaders.push({ key: '', value: '', enabled: true });
+        }
+      }
+
       setRequest({
         method,
         url: (isWebSocket || isSocketio) ? selectedEndpoint.path : getFullUrl(selectedEndpoint.path),
-        params: paramsFields,
-        headers: [{ key: '', value: '', enabled: true }],
+        params: initParams,
+        headers: initHeaders,
         body,
       });
     }
@@ -405,11 +429,33 @@ function App() {
         body = JSON.stringify(exampleData, null, 2);
       }
 
+      // For SIO endpoints, populate auth fields as params and connectHeaders as headers
+      let sioParams = paramsFields;
+      let sioHeaders: KeyValue[] = [{ key: '', value: '', enabled: true }];
+      if (endpoint.endpointType === 'socketio') {
+        if (endpoint.auth?.fields) {
+          sioParams = [];
+          endpoint.auth.fields.forEach((field) => {
+            const value = field.example !== undefined ? String(field.example) : '';
+            sioParams.push({ key: field.name, value, enabled: true });
+          });
+          sioParams.push({ key: '', value: '', enabled: true });
+        }
+        if (endpoint.connectHeaders?.fields) {
+          sioHeaders = [];
+          endpoint.connectHeaders.fields.forEach((field) => {
+            const value = field.example !== undefined ? String(field.example) : '';
+            sioHeaders.push({ key: field.name, value, enabled: true });
+          });
+          sioHeaders.push({ key: '', value: '', enabled: true });
+        }
+      }
+
       setRequest({
         method,
         url: (endpoint.endpointType === 'websocket' || endpoint.endpointType === 'socketio') ? endpoint.path : getFullUrl(endpoint.path),
-        params: paramsFields,
-        headers: [{ key: '', value: '', enabled: true }],
+        params: endpoint.endpointType === 'socketio' ? sioParams : paramsFields,
+        headers: sioHeaders,
         body,
       });
       setResponse(null);
@@ -565,8 +611,22 @@ function App() {
 
       setLoading(true);
       try {
+        // Build auth object from params (used for SIO auth)
+        const authObj: Record<string, string> = {};
+        resolvedParams.forEach((p) => {
+          if (p.enabled && p.key) authObj[p.key] = p.value;
+        });
+
+        // Build extraHeaders from headers
+        const extraHeaders: Record<string, string> = {};
+        resolvedHeaders.forEach((h) => {
+          if (h.enabled && h.key) extraHeaders[h.key] = h.value;
+        });
+
         const sio = sioConnect(resolvedUrl, {
           transports: ['websocket', 'polling'],
+          ...(Object.keys(authObj).length > 0 ? { auth: authObj } : {}),
+          ...(Object.keys(extraHeaders).length > 0 ? { extraHeaders } : {}),
         });
         sio.on('connect', () => {
           setWsConnected(true);

@@ -138,7 +138,19 @@
         "2": { "name": "string.unquoted.url.rqc" }
       },
       "patterns": [
+        { "include": "#sio-auth-headers" },
         { "include": "#ws-event" },
+        { "include": "#properties" },
+        { "include": "#comments" }
+      ]
+    },
+    "sio-auth-headers": {
+      "begin": "\\b(auth|headers)\\s*\\{",
+      "end": "\\}",
+      "beginCaptures": { "1": { "name": "keyword.other.block.rqc" } },
+      "patterns": [
+        { "include": "#fields" },
+        { "include": "#annotations" },
         { "include": "#comments" }
       ]
     },

@@ -26,6 +26,10 @@ pub struct WsBlock {
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connect_headers: Option<SchemaBlock>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,6 +189,10 @@ pub struct ApiEndpoint {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub events: Option<Vec<WsEvent>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connect_headers: Option<SchemaBlock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub category_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub category_name: Option<String>,
@@ -234,6 +242,8 @@ impl RqcConfig {
                     request: method.request.clone(),
                     response: method.response.clone(),
                     events: None,
+                    auth: None,
+                    connect_headers: None,
                     category_id: None,
                     category_name: None,
                 });
@@ -254,6 +264,8 @@ impl RqcConfig {
                 request: None,
                 response: None,
                 events: Some(ws.events.clone()),
+                auth: None,
+                connect_headers: None,
                 category_id: None,
                 category_name: None,
             });
@@ -273,6 +285,8 @@ impl RqcConfig {
                 request: None,
                 response: None,
                 events: Some(sio.events.clone()),
+                auth: sio.auth.clone(),
+                connect_headers: sio.connect_headers.clone(),
                 category_id: None,
                 category_name: None,
             });
@@ -312,6 +326,8 @@ impl RqcConfig {
                         request: method.request.clone(),
                         response: method.response.clone(),
                         events: None,
+                        auth: None,
+                        connect_headers: None,
                         category_id: Some(category.id.clone()),
                         category_name: category.name.clone(),
                     });
@@ -332,6 +348,8 @@ impl RqcConfig {
                     request: None,
                     response: None,
                     events: Some(ws.events.clone()),
+                    auth: None,
+                    connect_headers: None,
                     category_id: Some(category.id.clone()),
                     category_name: category.name.clone(),
                 });
@@ -351,6 +369,8 @@ impl RqcConfig {
                     request: None,
                     response: None,
                     events: Some(sio.events.clone()),
+                    auth: sio.auth.clone(),
+                    connect_headers: sio.connect_headers.clone(),
                     category_id: Some(category.id.clone()),
                     category_name: category.name.clone(),
                 });
