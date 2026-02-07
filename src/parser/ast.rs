@@ -239,6 +239,10 @@ pub struct CategoryInfo {
     pub children: Vec<CategoryInfo>,
 }
 
+fn is_full_url(path: &str) -> bool {
+    path.contains("://")
+}
+
 impl RqcConfig {
     pub fn get_base_urls(&self) -> Vec<String> {
         self.config
@@ -256,9 +260,13 @@ impl RqcConfig {
         for api in &self.apis {
             for method in &api.methods {
                 id_counter += 1;
-                let full_url = base_url
-                    .as_ref()
-                    .map(|base| format!("{}{}", base.trim_end_matches('/'), &api.path));
+                let full_url = if is_full_url(&api.path) {
+                    Some(api.path.clone())
+                } else {
+                    base_url
+                        .as_ref()
+                        .map(|base| format!("{}{}", base.trim_end_matches('/'), &api.path))
+                };
 
                 endpoints.push(ApiEndpoint {
                     id: format!("api-{}", id_counter),
@@ -327,9 +335,13 @@ impl RqcConfig {
         // Process top-level SSE APIs
         for sse in &self.sse_apis {
             id_counter += 1;
-            let full_url = base_url
-                .as_ref()
-                .map(|base| format!("{}{}", base.trim_end_matches('/'), &sse.path));
+            let full_url = if is_full_url(&sse.path) {
+                Some(sse.path.clone())
+            } else {
+                base_url
+                    .as_ref()
+                    .map(|base| format!("{}{}", base.trim_end_matches('/'), &sse.path))
+            };
 
             endpoints.push(ApiEndpoint {
                 id: format!("sse-{}", id_counter),
@@ -368,10 +380,15 @@ impl RqcConfig {
             for api in &category.apis {
                 for method in &api.methods {
                     *id_counter += 1;
-                    let full_path = format!("{}{}", current_prefix, api.path);
-                    let full_url = base_url
-                        .as_ref()
-                        .map(|base| format!("{}{}", base.trim_end_matches('/'), &full_path));
+                    let (full_path, full_url) = if is_full_url(&api.path) {
+                        (api.path.clone(), Some(api.path.clone()))
+                    } else {
+                        let fp = format!("{}{}", current_prefix, api.path);
+                        let fu = base_url
+                            .as_ref()
+                            .map(|base| format!("{}{}", base.trim_end_matches('/'), &fp));
+                        (fp, fu)
+                    };
 
                     endpoints.push(ApiEndpoint {
                         id: format!("api-{}", id_counter),
@@ -440,10 +457,15 @@ impl RqcConfig {
             // Process SSE APIs in this category
             for sse in &category.sse_apis {
                 *id_counter += 1;
-                let full_path = format!("{}{}", current_prefix, sse.path);
-                let full_url = base_url
-                    .as_ref()
-                    .map(|base| format!("{}{}", base.trim_end_matches('/'), &full_path));
+                let (full_path, full_url) = if is_full_url(&sse.path) {
+                    (sse.path.clone(), Some(sse.path.clone()))
+                } else {
+                    let fp = format!("{}{}", current_prefix, sse.path);
+                    let fu = base_url
+                        .as_ref()
+                        .map(|base| format!("{}{}", base.trim_end_matches('/'), &fp));
+                    (fp, fu)
+                };
 
                 endpoints.push(ApiEndpoint {
                     id: format!("sse-{}", id_counter),

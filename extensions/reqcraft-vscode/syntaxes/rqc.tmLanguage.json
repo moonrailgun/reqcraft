@@ -48,7 +48,7 @@
       "beginCaptures": { "1": { "name": "variable.other.property.rqc" } },
       "patterns": [
         { "name": "punctuation.separator.comma.rqc", "match": "\\s*,\\s*" },
-        { "name": "string.unquoted.url.rqc", "match": "https?://[-a-zA-Z0-9_.:/?#\\[\\]@!$&'()*+;=%~]+" }
+        { "name": "string.unquoted.url.rqc", "match": "[a-zA-Z][a-zA-Z0-9+\\-.]*://[-a-zA-Z0-9_.:/?#\\[\\]@!$&'()*+;=%~]+" }
       ]
     },
     "configVariable": {
@@ -109,7 +109,7 @@
       ]
     },
     "api": {
-      "begin": "\\b(api)\\s+(/[^\\s{]*)\\s*\\{",
+      "begin": "\\b(api)\\s+(\\S+)\\s*\\{",
       "end": "\\}",
       "beginCaptures": {
         "1": { "name": "keyword.declaration.rqc" },
@@ -147,7 +147,7 @@
       ]
     },
     "sse": {
-      "begin": "\\b(sse)\\s+(/[^\\s{]*)\\s*\\{",
+      "begin": "\\b(sse)\\s+(\\S+)\\s*\\{",
       "end": "\\}",
       "beginCaptures": {
         "1": { "name": "keyword.declaration.rqc" },

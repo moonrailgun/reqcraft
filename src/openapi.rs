@@ -106,7 +106,7 @@ pub fn parse_openapi_url(url: &str) -> Result<RqcConfig, Box<dyn std::error::Err
 
 /// Check if a path is a URL
 pub fn is_url(path: &str) -> bool {
-    path.starts_with("http://") || path.starts_with("https://")
+    path.contains("://")
 }
 
 fn parse_openapi_content(

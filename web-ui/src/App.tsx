@@ -335,7 +335,7 @@ function App() {
 
   const getFullUrl = useCallback(
     (path: string, baseUrl?: string) => {
-      if (/^https?:\/\//i.test(path)) return path;
+      if (/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//i.test(path)) return path;
       const base = baseUrl || selectedBaseUrl;
       if (base) {
         return `${base.replace(/\/$/, '')}${path}`;

@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 const LANG_SELECTOR = { language: 'rqc', scheme: 'file' };
-const URL_PATTERN = /https?:\/\/[-a-zA-Z0-9_.:/?#\[\]@!$&'()*+;=%~]+/g;
+const URL_PATTERN = /[a-zA-Z][a-zA-Z0-9+\-.]*:\/\/[-a-zA-Z0-9_.:/?#\[\]@!$&'()*+;=%~]+/g;
 const HTTP_METHODS = ['get', 'post', 'put', 'delete', 'patch'];
 
 export function activate(context: vscode.ExtensionContext) {

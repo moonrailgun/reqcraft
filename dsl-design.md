@@ -171,6 +171,34 @@ config {
 }
 ```
 
+### 完整 URL 覆盖
+
+`api` 和 `sse` 块除了支持相对路径（自动拼接 baseUrl）外，也支持直接输入完整 URL。当 URL 中包含 `://` 时，会跳过 baseUrl 拼接，直接使用该 URL 发送请求。
+
+这适用于需要调用不同服务、不同协议的场景：
+
+```
+api https://other-server.com/api/data {
+  get {
+    request {}
+    response {
+      result String
+    }
+  }
+}
+
+sse https://stream.example.com/events {
+  name "External Events"
+  response {
+    event update {
+      data String
+    }
+  }
+}
+```
+
+> `ws` 和 `socketio` 块本身就要求输入完整 URL，不受此影响。
+
 ### 全局变量
 
 在 config 中可以定义全局变量，这些变量可以在 URL、Headers、Params、Body 等位置使用 `{variableName}` 语法进行引用。

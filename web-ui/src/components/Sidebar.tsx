@@ -869,8 +869,18 @@ function UncategorizedGroup({
   const grouped = useMemo(() => {
     const groups: Record<string, ApiEndpoint[]> = {};
     httpEndpoints.forEach((ep) => {
-      const parts = ep.path.split('/').filter(Boolean);
-      const group = parts.length > 1 ? `/${parts[0]}` : '/';
+      let group: string;
+      if (/^[a-zA-Z][a-zA-Z0-9+\-.]*:\/\//.test(ep.path)) {
+        try {
+          const parsed = new URL(ep.path);
+          group = parsed.origin;
+        } catch {
+          group = ep.path;
+        }
+      } else {
+        const parts = ep.path.split('/').filter(Boolean);
+        group = parts.length > 1 ? `/${parts[0]}` : '/';
+      }
       if (!groups[group]) {
         groups[group] = [];
       }
@@ -921,7 +931,13 @@ function UncategorizedGroup({
             <Text
               size="sm"
               fw={500}
-              style={{ flex: 1, color: 'rgba(255, 255, 255, 0.7)' }}
+              style={{
+                flex: 1,
+                color: 'rgba(255, 255, 255, 0.7)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
             >
               {group}
             </Text>
