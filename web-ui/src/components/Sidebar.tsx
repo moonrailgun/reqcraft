@@ -50,6 +50,7 @@ const methodStyles: Record<string, { bg: string; text: string }> = {
   DELETE: { bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171' },
   PATCH: { bg: 'rgba(20, 184, 166, 0.15)', text: '#2dd4bf' },
   WS: { bg: 'rgba(139, 92, 246, 0.15)', text: '#a78bfa' },
+  SIO: { bg: 'rgba(132, 204, 22, 0.15)', text: '#a3e635' },
 };
 
 interface TreeItemProps {
@@ -251,7 +252,7 @@ function EndpointItem({
   level = 0,
 }: EndpointItemProps) {
   const isSelected = selectedId === endpoint.id;
-  const displayMethod = endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method || 'GET');
+  const displayMethod = endpoint.endpointType === 'websocket' ? 'WS' : endpoint.endpointType === 'socketio' ? 'SIO' : (endpoint.method || 'GET');
   const methodStyle = methodStyles[displayMethod] || {
     bg: 'rgba(156, 163, 175, 0.15)',
     text: '#9ca3af',
@@ -445,7 +446,8 @@ function WebSocketItem({
   level = 0,
 }: WebSocketItemProps) {
   const isSelected = selectedId === endpoint.id;
-  const methodStyle = methodStyles['WS'];
+  const isSio = endpoint.endpointType === 'socketio';
+  const methodStyle = methodStyles[isSio ? 'SIO' : 'WS'];
 
   // Extract display name from URL
   const getDisplayUrl = (url: string) => {
@@ -477,7 +479,7 @@ function WebSocketItem({
             padding: '6px 12px',
             borderRadius: 6,
             backgroundColor: isSelected
-              ? 'rgba(139, 92, 246, 0.15)'
+              ? (isSio ? 'rgba(132, 204, 22, 0.15)' : 'rgba(139, 92, 246, 0.15)')
               : 'transparent',
             transition: 'all 0.15s ease',
           }}
@@ -487,7 +489,7 @@ function WebSocketItem({
             <IconPlugConnected
               size={14}
               style={{
-                color: isSelected ? '#a78bfa' : 'rgba(255, 255, 255, 0.4)',
+                color: isSelected ? (isSio ? '#a3e635' : '#a78bfa') : 'rgba(255, 255, 255, 0.4)',
                 flexShrink: 0,
               }}
             />
@@ -508,7 +510,7 @@ function WebSocketItem({
                   fontSize: 10,
                 }}
               >
-                WS
+                {isSio ? 'SIO' : 'WS'}
               </Text>
             </Box>
             <Text
@@ -542,7 +544,7 @@ function WebSocketItem({
             <Text
               size="xs"
               style={{
-                color: 'rgba(139, 92, 246, 0.6)',
+                color: isSio ? 'rgba(132, 204, 22, 0.6)' : 'rgba(139, 92, 246, 0.6)',
                 marginLeft: 22,
               }}
             >
@@ -552,6 +554,93 @@ function WebSocketItem({
         </UnstyledButton>
       </Tooltip>
     </TreeItem>
+  );
+}
+
+interface SocketIOGroupProps {
+  endpoints: ApiEndpoint[];
+  selectedId?: string;
+  onSelect: (endpoint: ApiEndpoint) => void;
+}
+
+function SocketIOGroup({
+  endpoints,
+  selectedId,
+  onSelect,
+}: SocketIOGroupProps) {
+  const [opened, setOpened] = useState(true);
+
+  if (endpoints.length === 0) return null;
+
+  return (
+    <Box>
+      <UnstyledButton
+        onClick={() => setOpened((o) => !o)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          padding: '8px 12px',
+          borderRadius: 6,
+          transition: 'all 0.15s ease',
+        }}
+        className="hover:bg-[rgba(255,255,255,0.05)]"
+      >
+        <Box
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 20,
+            height: 20,
+            borderRadius: 4,
+          }}
+        >
+          <IconChevronRight
+            size={14}
+            style={{
+              transform: opened ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+              color: 'rgba(255, 255, 255, 0.5)',
+            }}
+          />
+        </Box>
+        <IconPlugConnected size={18} style={{ color: '#a3e635', flexShrink: 0 }} />
+        <Text
+          size="sm"
+          fw={500}
+          style={{ flex: 1, color: 'rgba(255, 255, 255, 0.7)' }}
+        >
+          Socket.IO
+        </Text>
+        <Badge
+          size="xs"
+          variant="light"
+          style={{
+            backgroundColor: 'rgba(132, 204, 22, 0.15)',
+            color: '#a3e635',
+            border: 'none',
+          }}
+        >
+          {endpoints.length}
+        </Badge>
+      </UnstyledButton>
+
+      <Collapse in={opened}>
+        <Stack gap={2} style={{ marginTop: 2 }}>
+          {endpoints.map((ep) => (
+            <WebSocketItem
+              key={ep.id}
+              endpoint={ep}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              level={1}
+            />
+          ))}
+        </Stack>
+      </Collapse>
+    </Box>
   );
 }
 
@@ -568,9 +657,9 @@ function UncategorizedGroup({
 }: UncategorizedGroupProps) {
   const [opened, setOpened] = useState(true);
 
-  // Filter out WebSocket endpoints - they are shown in WebSocketGroup
+  // Filter out WebSocket and SocketIO endpoints - they are shown in their own groups
   const httpEndpoints = useMemo(
-    () => endpoints.filter((ep) => ep.endpointType !== 'websocket'),
+    () => endpoints.filter((ep) => ep.endpointType !== 'websocket' && ep.endpointType !== 'socketio'),
     [endpoints]
   );
 
@@ -690,6 +779,11 @@ export const Sidebar = memo(function Sidebar({
 
   const uncategorizedWsEndpoints = useMemo(
     () => uncategorizedEndpoints.filter((ep) => ep.endpointType === 'websocket'),
+    [uncategorizedEndpoints]
+  );
+
+  const uncategorizedSioEndpoints = useMemo(
+    () => uncategorizedEndpoints.filter((ep) => ep.endpointType === 'socketio'),
     [uncategorizedEndpoints]
   );
 
@@ -886,6 +980,13 @@ export const Sidebar = memo(function Sidebar({
             {/* WebSocket endpoints first */}
             <WebSocketGroup
               endpoints={uncategorizedWsEndpoints}
+              selectedId={selectedId}
+              onSelect={onSelect}
+            />
+
+            {/* SocketIO endpoints */}
+            <SocketIOGroup
+              endpoints={uncategorizedSioEndpoints}
               selectedId={selectedId}
               onSelect={onSelect}
             />

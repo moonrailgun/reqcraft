@@ -332,3 +332,25 @@ ws https://echo.websocket.org/ {
   event bar { }
 }
 ```
+
+### SocketIO 支持
+
+同时支持 socketio 事件，格式参考
+
+```
+socketio http://localhost:3000/ {
+  event foo {
+    request {
+      foo String
+      bar Number
+    }
+    
+    response {
+      foo String
+      bar Number
+    }
+  }
+  
+  event bar { }
+}
+```

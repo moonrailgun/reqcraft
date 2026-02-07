@@ -137,5 +137,21 @@
       "}"
     ],
     "description": "WebSocket event"
+  },
+  "SocketIO": {
+    "prefix": "socketio",
+    "body": [
+      "socketio ${1:http://localhost:3000/} {",
+      "\tevent ${2:eventName} {",
+      "\t\trequest {",
+      "\t\t\t$3",
+      "\t\t}",
+      "\t\tresponse {",
+      "\t\t\t$0",
+      "\t\t}",
+      "\t}",
+      "}"
+    ],
+    "description": "SocketIO endpoint"
   }
 }

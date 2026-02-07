@@ -20,6 +20,7 @@ const methodColors: Record<HttpMethod, string> = {
   DELETE: 'red',
   PATCH: 'teal',
   WS: 'violet',
+  SIO: 'lime',
 };
 
 const BADGE_STYLES = {
@@ -51,7 +52,7 @@ export const RequestBuilder = memo(function RequestBuilder({
   loading,
   wsConnected,
 }: RequestBuilderProps) {
-  const isWs = method === 'WS';
+  const isWs = method === 'WS' || method === 'SIO';
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => onUrlChange(e.target.value),
@@ -82,7 +83,7 @@ export const RequestBuilder = memo(function RequestBuilder({
         <TextInput
           value={url}
           onChange={handleChange}
-          placeholder={isWs ? "Enter WebSocket URL" : "Enter request URL"}
+          placeholder={isWs ? (method === 'SIO' ? "Enter SocketIO URL" : "Enter WebSocket URL") : "Enter request URL"}
           flex={1}
           onKeyDown={handleKeyDown}
           styles={INPUT_STYLES}
@@ -91,7 +92,7 @@ export const RequestBuilder = memo(function RequestBuilder({
         <Button
           onClick={onSend}
           disabled={loading || !url}
-          color={isWs ? (wsConnected ? "red" : "violet") : "orange"}
+          color={isWs ? (wsConnected ? "red" : method === 'SIO' ? "lime" : "violet") : "orange"}
           leftSection={
             loading ? (
               <IconLoader2 size={16} className="animate-spin" />

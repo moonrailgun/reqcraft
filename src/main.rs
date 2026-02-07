@@ -313,6 +313,9 @@ fn merge_configs(target: &mut RqcConfig, source: RqcConfig) {
     // Merge WebSocket APIs
     target.ws_apis.extend(source.ws_apis);
 
+    // Merge SocketIO APIs
+    target.socketio_apis.extend(source.socketio_apis);
+
     // Merge categories
     target.categories.extend(source.categories);
 }

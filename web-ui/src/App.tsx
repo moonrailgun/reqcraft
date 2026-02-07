@@ -28,8 +28,9 @@ import {
 } from './utils/variables';
 import { generateExampleFromSchema, hasBodyFields } from './utils/schema';
 import { useServiceWSStore } from './store/useWebSocketStore';
+import { io as sioConnect, type Socket as SioSocket } from 'socket.io-client';
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS' | 'SIO';
 
 export interface KeyValue {
   key: string;
@@ -62,7 +63,7 @@ export interface WsEvent {
 
 export interface ApiEndpoint {
   id: string;
-  endpointType: 'http' | 'websocket';
+  endpointType: 'http' | 'websocket' | 'socketio';
   path: string;
   fullUrl: string | null;
   method: string | null;
@@ -131,6 +132,7 @@ function App() {
   const [wsMessages, setWsMessages] = useState<{ type: 'sent' | 'received', data: string, time: number, event?: string }[]>([]);
   const [wsConnected, setWsConnected] = useState(false);
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [sioSocket, setSioSocket] = useState<SioSocket | null>(null);
   const [loading, setLoading] = useState(false);
   const pendingWsEventRef = useRef<{ eventName: string; data: string } | null>(null);
   const selectedEndpointRef = useRef<ApiEndpoint | null>(null);
@@ -215,6 +217,8 @@ function App() {
             let endpoint: ApiEndpoint | undefined;
             if (type === 'ws') {
               endpoint = data.find((e) => e.path === path && e.endpointType === 'websocket');
+            } else if (type === 'sio') {
+              endpoint = data.find((e) => e.path === path && e.endpointType === 'socketio');
             } else if (method) {
               endpoint = data.find((e) => e.path === path && e.method === method);
             }
@@ -346,7 +350,8 @@ function App() {
 
       // Determine method based on endpoint type
       const isWebSocket = selectedEndpoint.endpointType === 'websocket';
-      const method: HttpMethod = isWebSocket ? 'WS' : (selectedEndpoint.method as HttpMethod) || 'GET';
+      const isSocketio = selectedEndpoint.endpointType === 'socketio';
+      const method: HttpMethod = isWebSocket ? 'WS' : isSocketio ? 'SIO' : (selectedEndpoint.method as HttpMethod) || 'GET';
 
       // Generate body example for POST/PUT/PATCH methods
       let body = '';
@@ -357,7 +362,7 @@ function App() {
 
       setRequest({
         method,
-        url: isWebSocket ? selectedEndpoint.path : getFullUrl(selectedEndpoint.path),
+        url: (isWebSocket || isSocketio) ? selectedEndpoint.path : getFullUrl(selectedEndpoint.path),
         params: paramsFields,
         headers: [{ key: '', value: '', enabled: true }],
         body,
@@ -391,7 +396,7 @@ function App() {
       }
       paramsFields.push({ key: '', value: '', enabled: true });
 
-      const method = endpoint.endpointType === 'websocket' ? 'WS' : (endpoint.method as HttpMethod);
+      const method: HttpMethod = endpoint.endpointType === 'websocket' ? 'WS' : endpoint.endpointType === 'socketio' ? 'SIO' : (endpoint.method as HttpMethod);
 
       // Generate body example for POST/PUT/PATCH methods
       let body = '';
@@ -402,7 +407,7 @@ function App() {
 
       setRequest({
         method,
-        url: endpoint.endpointType === 'websocket' ? endpoint.path : getFullUrl(endpoint.path),
+        url: (endpoint.endpointType === 'websocket' || endpoint.endpointType === 'socketio') ? endpoint.path : getFullUrl(endpoint.path),
         params: paramsFields,
         headers: [{ key: '', value: '', enabled: true }],
         body,
@@ -414,18 +419,25 @@ function App() {
         setSocket(null);
         setWsConnected(false);
       }
+      if (sioSocket) {
+        sioSocket.disconnect();
+        setSioSocket(null);
+        setWsConnected(false);
+      }
 
       // Update URL with path and method/type
       const urlParams = new URLSearchParams();
       urlParams.set('path', endpoint.path);
       if (endpoint.endpointType === 'websocket') {
         urlParams.set('type', 'ws');
+      } else if (endpoint.endpointType === 'socketio') {
+        urlParams.set('type', 'sio');
       } else if (endpoint.method) {
         urlParams.set('method', endpoint.method);
       }
       window.history.replaceState(null, '', `?${urlParams.toString()}`);
     },
-    [getFullUrl, categories, findCategoryPath, socket]
+    [getFullUrl, categories, findCategoryPath, socket, sioSocket]
   );
 
   const handleCategorySelect = useCallback((category: CategoryInfo) => {
@@ -543,6 +555,62 @@ function App() {
       return;
     }
 
+    if (request.method === 'SIO') {
+      if (wsConnected) {
+        sioSocket?.disconnect();
+        setSioSocket(null);
+        setWsConnected(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const sio = sioConnect(resolvedUrl, {
+          transports: ['websocket', 'polling'],
+        });
+        sio.on('connect', () => {
+          setWsConnected(true);
+          setLoading(false);
+          setSioSocket(sio);
+          setWsMessages(prev => [...prev, { type: 'received', data: 'Connected to ' + resolvedUrl, time: Date.now() }]);
+
+          if (pendingWsEventRef.current) {
+            const { eventName, data } = pendingWsEventRef.current;
+            try {
+              sio.emit(eventName, JSON.parse(data));
+            } catch {
+              sio.emit(eventName, data);
+            }
+            setWsMessages(prev => [...prev, { type: 'sent', data, time: Date.now(), event: eventName }]);
+            pendingWsEventRef.current = null;
+          }
+
+          // Listen for events defined in the endpoint
+          if (selectedEndpoint?.events) {
+            for (const ev of selectedEndpoint.events) {
+              sio.on(ev.name, (...args: unknown[]) => {
+                const msgData = args.length === 1 ? JSON.stringify(args[0], null, 2) : JSON.stringify(args, null, 2);
+                setWsMessages(prev => [...prev, { type: 'received', data: msgData, time: Date.now(), event: ev.name }]);
+              });
+            }
+          }
+        });
+        sio.on('disconnect', () => {
+          setWsConnected(false);
+          setSioSocket(null);
+          setWsMessages(prev => [...prev, { type: 'received', data: 'Disconnected', time: Date.now() }]);
+        });
+        sio.on('connect_error', (error) => {
+          setWsMessages(prev => [...prev, { type: 'received', data: 'SocketIO Error: ' + error.message, time: Date.now() }]);
+          setLoading(false);
+        });
+      } catch (err) {
+        setWsMessages(prev => [...prev, { type: 'received', data: 'Error: ' + (err instanceof Error ? err.message : String(err)), time: Date.now() }]);
+        setLoading(false);
+      }
+      return;
+    }
+
     setLoading(true);
     const startTime = Date.now();
 
@@ -648,14 +716,21 @@ function App() {
   }, []);
 
   const handleSendEvent = useCallback((eventName: string, data: string) => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
+    if (sioSocket?.connected) {
+      try {
+        sioSocket.emit(eventName, JSON.parse(data));
+      } catch {
+        sioSocket.emit(eventName, data);
+      }
+      setWsMessages(prev => [...prev, { type: 'sent', data, time: Date.now(), event: eventName }]);
+    } else if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(data);
       setWsMessages(prev => [...prev, { type: 'sent', data, time: Date.now(), event: eventName }]);
     } else if (!wsConnected && !loading) {
       pendingWsEventRef.current = { eventName, data };
       handleSendRef.current(false);
     }
-  }, [socket, wsConnected, loading]);
+  }, [socket, sioSocket, wsConnected, loading]);
 
   return (
     <div className="h-screen bg-bg-primary">
@@ -696,7 +771,7 @@ function App() {
                   onUrlChange={handleUrlChange}
                   onSend={handleSendRequest}
                   onMockSend={mockMode && selectedEndpoint && selectedEndpoint.endpointType === 'http' ? handleMockSendRequest : undefined}
-                  loading={loading || (request.method === 'WS' && !wsConnected && !!socket)}
+                  loading={loading || ((request.method === 'WS' || request.method === 'SIO') && !wsConnected && !!(socket || sioSocket))}
                   wsConnected={wsConnected}
                 />
 
@@ -748,7 +823,7 @@ function App() {
                       <ResponsePanel
                         response={response}
                         loading={loading}
-                        isWs={request.method === 'WS'}
+                        isWs={request.method === 'WS' || request.method === 'SIO'}
                         wsMessages={wsMessages}
                         wsConnected={wsConnected}
                       />

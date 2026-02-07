@@ -12,6 +12,8 @@ pub struct RqcConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ws_apis: Vec<WsBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub socketio_apis: Vec<WsBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub categories: Vec<CategoryBlock>,
 }
 
@@ -50,6 +52,8 @@ pub struct CategoryBlock {
     pub apis: Vec<ApiBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ws_apis: Vec<WsBlock>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub socketio_apis: Vec<WsBlock>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<CategoryBlock>,
 }
@@ -157,6 +161,7 @@ pub enum MockValue {
 pub enum EndpointType {
     Http,
     Websocket,
+    Socketio,
 }
 
 // Flattened API representation for Web UI
@@ -254,6 +259,25 @@ impl RqcConfig {
             });
         }
 
+        // Process top-level SocketIO APIs
+        for sio in &self.socketio_apis {
+            id_counter += 1;
+            endpoints.push(ApiEndpoint {
+                id: format!("sio-{}", id_counter),
+                endpoint_type: EndpointType::Socketio,
+                path: sio.url.clone(),
+                full_url: Some(sio.url.clone()),
+                method: None,
+                name: sio.name.clone(),
+                description: sio.description.clone(),
+                request: None,
+                response: None,
+                events: Some(sio.events.clone()),
+                category_id: None,
+                category_name: None,
+            });
+        }
+
         // Process categories recursively
         fn process_category(
             category: &CategoryBlock,
@@ -313,6 +337,25 @@ impl RqcConfig {
                 });
             }
 
+            // Process SocketIO APIs in this category
+            for sio in &category.socketio_apis {
+                *id_counter += 1;
+                endpoints.push(ApiEndpoint {
+                    id: format!("sio-{}", id_counter),
+                    endpoint_type: EndpointType::Socketio,
+                    path: sio.url.clone(),
+                    full_url: Some(sio.url.clone()),
+                    method: None,
+                    name: sio.name.clone(),
+                    description: sio.description.clone(),
+                    request: None,
+                    response: None,
+                    events: Some(sio.events.clone()),
+                    category_id: Some(category.id.clone()),
+                    category_name: category.name.clone(),
+                });
+            }
+
             // Process nested categories
             for child in &category.children {
                 process_category(child, base_url, &current_prefix, endpoints, id_counter);
@@ -333,6 +376,7 @@ impl RqcConfig {
                 endpoint_count += api.methods.len();
             }
             endpoint_count += category.ws_apis.len();
+            endpoint_count += category.socketio_apis.len();
 
             CategoryInfo {
                 id: category.id.clone(),

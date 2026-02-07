@@ -62,6 +62,9 @@ impl Parser {
                 "ws" => {
                     config.ws_apis.push(self.parse_ws_block()?);
                 }
+                "socketio" => {
+                    config.socketio_apis.push(self.parse_ws_block()?);
+                }
                 "import" => {
                     config.imports.push(self.parse_import()?);
                 }
@@ -539,6 +542,7 @@ impl Parser {
             prefix: None,
             apis: Vec::new(),
             ws_apis: Vec::new(),
+            socketio_apis: Vec::new(),
             children: Vec::new(),
         };
 
@@ -574,6 +578,9 @@ impl Parser {
                 }
                 "ws" => {
                     category.ws_apis.push(self.parse_ws_block()?);
+                }
+                "socketio" => {
+                    category.socketio_apis.push(self.parse_ws_block()?);
                 }
                 "category" => {
                     category.children.push(self.parse_category_block(counter)?);

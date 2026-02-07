@@ -239,7 +239,7 @@ export const RequestTabs = memo(function RequestTabs({
 }: RequestTabsProps) {
   const methodUpper = method?.toUpperCase() || '';
   const showBodyTab = METHODS_WITH_BODY.includes(methodUpper);
-  const isWs = methodUpper === 'WS';
+  const isWs = methodUpper === 'WS' || methodUpper === 'SIO';
 
   // WebSocket event editing state
   const [selectedWsEvent, setSelectedWsEvent] = useState<WsEvent | null>(null);

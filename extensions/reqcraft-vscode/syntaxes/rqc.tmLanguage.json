@@ -9,6 +9,7 @@
     { "include": "#category" },
     { "include": "#api" },
     { "include": "#websocket" },
+    { "include": "#socketio" },
     { "include": "#annotations" },
     { "include": "#types" },
     { "include": "#strings" },
@@ -99,6 +100,8 @@
         { "include": "#properties" },
         { "include": "#category" },
         { "include": "#api" },
+        { "include": "#websocket" },
+        { "include": "#socketio" },
         { "include": "#strings" },
         { "include": "#comments" }
       ]
@@ -117,6 +120,18 @@
     },
     "websocket": {
       "begin": "\\b(ws)\\s+(\\S+)\\s*\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.declaration.rqc" },
+        "2": { "name": "string.unquoted.url.rqc" }
+      },
+      "patterns": [
+        { "include": "#ws-event" },
+        { "include": "#comments" }
+      ]
+    },
+    "socketio": {
+      "begin": "\\b(socketio)\\s+(\\S+)\\s*\\{",
       "end": "\\}",
       "beginCaptures": {
         "1": { "name": "keyword.declaration.rqc" },
