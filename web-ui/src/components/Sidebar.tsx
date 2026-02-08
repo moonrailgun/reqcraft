@@ -20,6 +20,7 @@ import {
   IconVariable,
   IconPlugConnected,
   IconBroadcast,
+  IconSwitchVertical,
 } from '@tabler/icons-react';
 import type { ApiEndpoint, CategoryInfo } from '../App';
 import type { Variable } from '../utils/variables';
@@ -96,6 +97,8 @@ interface CategoryGroupProps {
   onSelect: (endpoint: ApiEndpoint) => void;
   onCategorySelect: (category: CategoryInfo) => void;
   level?: number;
+  forceExpanded?: boolean;
+  expandTrigger?: number;
 }
 
 function CategoryGroup({
@@ -108,8 +111,18 @@ function CategoryGroup({
   onSelect,
   onCategorySelect,
   level = 0,
+  forceExpanded,
+  expandTrigger,
 }: CategoryGroupProps) {
   const [opened, setOpened] = useState(true);
+
+  const [prevExpandTrigger, setPrevExpandTrigger] = useState(expandTrigger);
+  if (expandTrigger !== prevExpandTrigger) {
+    setPrevExpandTrigger(expandTrigger);
+    if (expandTrigger !== undefined && expandTrigger > 0) {
+      setOpened(forceExpanded ?? true);
+    }
+  }
 
   // Auto-expand when category is in expandedCategoryIds
   useEffect(() => {
@@ -232,6 +245,8 @@ function CategoryGroup({
               onSelect={onSelect}
               onCategorySelect={onCategorySelect}
               level={level + 1}
+              forceExpanded={forceExpanded}
+              expandTrigger={expandTrigger}
             />
           ))}
         </Stack>
@@ -351,14 +366,26 @@ interface WebSocketGroupProps {
   endpoints: ApiEndpoint[];
   selectedId?: string;
   onSelect: (endpoint: ApiEndpoint) => void;
+  forceExpanded?: boolean;
+  expandTrigger?: number;
 }
 
 function WebSocketGroup({
   endpoints,
   selectedId,
   onSelect,
+  forceExpanded,
+  expandTrigger,
 }: WebSocketGroupProps) {
   const [opened, setOpened] = useState(true);
+
+  const [prevExpandTrigger, setPrevExpandTrigger] = useState(expandTrigger);
+  if (expandTrigger !== prevExpandTrigger) {
+    setPrevExpandTrigger(expandTrigger);
+    if (expandTrigger !== undefined && expandTrigger > 0) {
+      setOpened(forceExpanded ?? true);
+    }
+  }
 
   if (endpoints.length === 0) return null;
 
@@ -563,14 +590,26 @@ interface SocketIOGroupProps {
   endpoints: ApiEndpoint[];
   selectedId?: string;
   onSelect: (endpoint: ApiEndpoint) => void;
+  forceExpanded?: boolean;
+  expandTrigger?: number;
 }
 
 function SocketIOGroup({
   endpoints,
   selectedId,
   onSelect,
+  forceExpanded,
+  expandTrigger,
 }: SocketIOGroupProps) {
   const [opened, setOpened] = useState(true);
+
+  const [prevExpandTrigger, setPrevExpandTrigger] = useState(expandTrigger);
+  if (expandTrigger !== prevExpandTrigger) {
+    setPrevExpandTrigger(expandTrigger);
+    if (expandTrigger !== undefined && expandTrigger > 0) {
+      setOpened(forceExpanded ?? true);
+    }
+  }
 
   if (endpoints.length === 0) return null;
 
@@ -650,14 +689,26 @@ interface SSEGroupProps {
   endpoints: ApiEndpoint[];
   selectedId?: string;
   onSelect: (endpoint: ApiEndpoint) => void;
+  forceExpanded?: boolean;
+  expandTrigger?: number;
 }
 
 function SSEGroup({
   endpoints,
   selectedId,
   onSelect,
+  forceExpanded,
+  expandTrigger,
 }: SSEGroupProps) {
   const [opened, setOpened] = useState(true);
+
+  const [prevExpandTrigger, setPrevExpandTrigger] = useState(expandTrigger);
+  if (expandTrigger !== prevExpandTrigger) {
+    setPrevExpandTrigger(expandTrigger);
+    if (expandTrigger !== undefined && expandTrigger > 0) {
+      setOpened(forceExpanded ?? true);
+    }
+  }
 
   if (endpoints.length === 0) return null;
 
@@ -851,14 +902,26 @@ interface UncategorizedGroupProps {
   endpoints: ApiEndpoint[];
   selectedId?: string;
   onSelect: (endpoint: ApiEndpoint) => void;
+  forceExpanded?: boolean;
+  expandTrigger?: number;
 }
 
 function UncategorizedGroup({
   endpoints,
   selectedId,
   onSelect,
+  forceExpanded,
+  expandTrigger,
 }: UncategorizedGroupProps) {
   const [opened, setOpened] = useState(true);
+
+  const [prevExpandTrigger, setPrevExpandTrigger] = useState(expandTrigger);
+  if (expandTrigger !== prevExpandTrigger) {
+    setPrevExpandTrigger(expandTrigger);
+    if (expandTrigger !== undefined && expandTrigger > 0) {
+      setOpened(forceExpanded ?? true);
+    }
+  }
 
   // Filter out WebSocket, SocketIO, and SSE endpoints - they are shown in their own groups
   const httpEndpoints = useMemo(
@@ -1013,6 +1076,14 @@ export const Sidebar = memo(function Sidebar({
 
   const activeVariableCount = variables.filter((v) => v.name && v.enabled).length;
   const wsConnected = useServiceWSStore((s) => s.connected);
+
+  const [allExpanded, setAllExpanded] = useState(true);
+  const [expandTrigger, setExpandTrigger] = useState(0);
+
+  const handleToggleAll = () => {
+    setAllExpanded((prev) => !prev);
+    setExpandTrigger((prev) => prev + 1);
+  };
 
   return (
     <Box
@@ -1188,6 +1259,23 @@ export const Sidebar = memo(function Sidebar({
             >
               API Endpoints
             </Text>
+            <Tooltip label={allExpanded ? 'Collapse All' : 'Expand All'} position="top">
+              <UnstyledButton
+                onClick={handleToggleAll}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 22,
+                  height: 22,
+                  borderRadius: 4,
+                  transition: 'background 0.15s ease',
+                }}
+                className="hover:bg-[rgba(255,255,255,0.1)]"
+              >
+                <IconSwitchVertical size={14} style={{ color: 'rgba(255, 255, 255, 0.4)' }} />
+              </UnstyledButton>
+            </Tooltip>
             <Badge
               size="xs"
               style={{
@@ -1206,6 +1294,8 @@ export const Sidebar = memo(function Sidebar({
               endpoints={uncategorizedWsEndpoints}
               selectedId={selectedId}
               onSelect={onSelect}
+              forceExpanded={allExpanded}
+              expandTrigger={expandTrigger}
             />
 
             {/* SocketIO endpoints */}
@@ -1213,6 +1303,8 @@ export const Sidebar = memo(function Sidebar({
               endpoints={uncategorizedSioEndpoints}
               selectedId={selectedId}
               onSelect={onSelect}
+              forceExpanded={allExpanded}
+              expandTrigger={expandTrigger}
             />
 
             {/* SSE endpoints */}
@@ -1220,6 +1312,8 @@ export const Sidebar = memo(function Sidebar({
               endpoints={uncategorizedSseEndpoints}
               selectedId={selectedId}
               onSelect={onSelect}
+              forceExpanded={allExpanded}
+              expandTrigger={expandTrigger}
             />
 
             {/* Non-OpenAPI categories */}
@@ -1236,6 +1330,8 @@ export const Sidebar = memo(function Sidebar({
                   expandedCategoryIds={expandedCategoryIds}
                   onSelect={onSelect}
                   onCategorySelect={onCategorySelect}
+                  forceExpanded={allExpanded}
+                  expandTrigger={expandTrigger}
                 />
               ))}
 
@@ -1243,6 +1339,8 @@ export const Sidebar = memo(function Sidebar({
               endpoints={uncategorizedEndpoints}
               selectedId={selectedId}
               onSelect={onSelect}
+              forceExpanded={allExpanded}
+              expandTrigger={expandTrigger}
             />
 
             {/* OpenAPI categories last */}
@@ -1259,6 +1357,8 @@ export const Sidebar = memo(function Sidebar({
                   expandedCategoryIds={expandedCategoryIds}
                   onSelect={onSelect}
                   onCategorySelect={onCategorySelect}
+                  forceExpanded={allExpanded}
+                  expandTrigger={expandTrigger}
                 />
               ))}
 
